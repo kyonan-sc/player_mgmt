@@ -37,7 +37,7 @@ import {
 } from '../services/admin-service'
 import { getDashboard } from '../services/dashboard-service'
 
-type AuthedAction = Exclude<ApiAction, 'health.check'>
+type AuthedAction = Exclude<ApiAction, 'health.check' | 'auth.guestLogin'>
 type Handler<A extends AuthedAction> = (ctx: Ctx, payload: ApiPayload<A>) => ApiResult<A>
 
 interface HandlerDef<A extends AuthedAction> {

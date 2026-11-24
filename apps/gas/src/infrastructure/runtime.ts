@@ -15,6 +15,8 @@ export interface AppConfig {
   googleClientId: string
   schemaVersion: string
   bootstrapAdminEmail: string | null
+  /** 検証環境専用のゲスト閲覧用パスワード。未設定ならゲスト入場は無効 */
+  guestViewerPassword: string | null
 }
 
 /** 実行環境（GAS / テスト / ブラウザ内モック）に依存する機能の抽象 */
@@ -25,6 +27,8 @@ export interface Runtime {
   withLock<T>(fn: () => T): T
   cache: CacheLike
   fetchText(url: string): HttpResponse
+  /** HMAC-SHA256 を16進文字列で返す */
+  hmacSha256Hex(key: string, message: string): string
   config: AppConfig
   logError(message: string, error?: unknown): void
 }

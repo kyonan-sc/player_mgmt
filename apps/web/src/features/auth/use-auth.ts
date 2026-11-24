@@ -24,10 +24,12 @@ export function useAuthActions() {
     [clear, queryClient],
   )
 
-  /** ID Token を受け取り、バックエンドで検証・コーチ照合を行う */
+  /** ID Token を受け取り、バックエンドで検証・コーチ照合を行う。ゲストは有効期限をサーバーの値で指定する */
   const signIn = useCallback(
-    async (idToken: string) => {
-      const expiresAt = env.useMock ? Date.now() + MOCK_TOKEN_TTL_MS : readTokenExpiry(idToken)
+    async (idToken: string, options: { expiresAt?: number } = {}) => {
+      const expiresAt =
+        options.expiresAt ??
+        (env.useMock ? Date.now() + MOCK_TOKEN_TTL_MS : readTokenExpiry(idToken))
       if (!expiresAt || expiresAt <= Date.now())
         throw new ApiClientError('UNAUTHENTICATED', 'ログイン情報が無効です')
       try {

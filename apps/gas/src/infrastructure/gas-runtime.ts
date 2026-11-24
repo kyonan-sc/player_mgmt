@@ -11,6 +11,7 @@ export function readConfig(): AppConfig {
     googleClientId: props.getProperty('GOOGLE_CLIENT_ID') ?? '',
     schemaVersion: props.getProperty('SCHEMA_VERSION') ?? SCHEMA_VERSION,
     bootstrapAdminEmail: props.getProperty('BOOTSTRAP_ADMIN_EMAIL'),
+    guestViewerPassword: props.getProperty('GUEST_VIEWER_PASSWORD'),
   }
 }
 
@@ -54,6 +55,10 @@ export function createGasRuntime(): Runtime {
       }
     },
     cache: new GasCache(),
+    hmacSha256Hex(key: string, message: string): string {
+      const bytes = Utilities.computeHmacSha256Signature(message, key)
+      return bytes.map((b) => (b < 0 ? b + 256 : b).toString(16).padStart(2, '0')).join('')
+    },
     fetchText(url: string): HttpResponse {
       const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true })
       const headers: Record<string, string> = {}

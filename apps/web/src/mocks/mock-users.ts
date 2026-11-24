@@ -1,3 +1,6 @@
+/** モックのパスワード入場に使うパスワード（架空のデータ用。実環境のパスワードではない） */
+export const MOCK_GUEST_PASSWORD = 'guest-demo'
+
 /** モックモードのログインユーザー（架空） */
 export const MOCK_USERS = [
   {

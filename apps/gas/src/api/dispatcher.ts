@@ -7,7 +7,8 @@ import {
 } from '@kyonan/shared'
 import type { z } from 'zod'
 import type { Ctx } from '../auth/authorization'
-import type { IdTokenVerifier } from '../auth/verifier'
+import { guestActor, isGuestToken, loginWithPassword, verifyGuestToken } from '../auth/guest-auth'
+import type { IdTokenVerifier, VerifiedClaims } from '../auth/verifier'
 import type { Runtime } from '../infrastructure/runtime'
 import type { TableStore } from '../infrastructure/table-store'
 import { createDb } from '../repositories/db'
@@ -68,18 +69,39 @@ export function handleRequest(rawBody: string, deps: ApiDeps): ApiResponse<unkno
       return { success: true, data, requestId }
     }
 
+    if (action === 'auth.guestLogin') {
+      const { password } = payload.data as { password: string }
+      return { success: true, data: loginWithPassword(deps.runtime, password), requestId }
+    }
+
     if (!idToken) throw new AppError('UNAUTHENTICATED', 'ログインが必要です')
-    const claims = deps.verifier.verify(idToken)
+    const guest = isGuestToken(idToken)
+    let claims: VerifiedClaims
+    if (guest) {
+      verifyGuestToken(deps.runtime, idToken)
+      claims = { sub: 'guest-viewer', email: 'guest-viewer@guest.invalid', emailVerified: true }
+    } else {
+      claims = deps.verifier.verify(idToken)
+    }
     enforceRateLimit(deps.runtime, claims.sub)
 
     const def = handlers[action]
+    // ゲストは読み取り専用。変更系 API はロールの判定より前に一律で拒否する。
+    if (guest && def.mutating) {
+      throw new AppError('FORBIDDEN', 'ゲストは閲覧のみ可能です。この操作はできません。')
+    }
     const idemKey = `idem:${claims.sub}:${requestId}`
     if (def.mutating) {
       const cached = deps.runtime.cache.get(idemKey)
       if (cached) return JSON.parse(cached) as ApiResponse<unknown>
     }
 
-    const { actor, db } = resolveActor(() => createDb(deps.store), claims, deps.runtime, requestId)
+    const { actor, db } = guest
+      ? (() => {
+          const guestDb = createDb(deps.store)
+          return { actor: guestActor(guestDb, deps.runtime.now()), db: guestDb }
+        })()
+      : resolveActor(() => createDb(deps.store), claims, deps.runtime, requestId)
     const run = (ctxDb: typeof db) => {
       const ctx: Ctx = { db: ctxDb, runtime: deps.runtime, actor, requestId, action }
       return (def.handler as (c: Ctx, p: unknown) => unknown)(ctx, payload.data)

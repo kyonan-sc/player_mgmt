@@ -18,6 +18,7 @@ import type {
   CycleOverview,
   DashboardData,
   HealthStatus,
+  GuestLoginResult,
   Me,
   PlayerDetail,
   PlayerListItem,
@@ -144,6 +145,7 @@ export const settingsInputSchema = z.object({
 export const apiPayloadSchemas = {
   'health.check': empty,
   'auth.me': empty,
+  'auth.guestLogin': z.object({ password: z.string().min(1).max(200) }),
   'dashboard.get': z.object({ groupId: idSchema.optional() }),
   'players.list': z.object({
     groupId: idSchema.optional(),
@@ -203,6 +205,7 @@ export type ApiPayload<A extends ApiAction> = z.output<(typeof apiPayloadSchemas
 export interface ApiResultMap {
   'health.check': HealthStatus
   'auth.me': Me
+  'auth.guestLogin': GuestLoginResult
   'dashboard.get': DashboardData
   'players.list': PlayerListItem[]
   'players.get': PlayerDetail

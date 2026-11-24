@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { callApi, errorMessage } from '@/lib/api-client'
 import { env } from '@/lib/env'
 import { cn } from '@/lib/utils'
-import { MOCK_USERS } from '@/mocks/mock-users'
+import { MOCK_GUEST_PASSWORD, MOCK_USERS } from '@/mocks/mock-users'
 import { useAuthStore } from '@/stores/auth-store'
+import { GuestPasswordLogin } from './GuestPasswordLogin'
+import { guestLoginAvailable } from './guest-login'
 import { loadGoogleIdentity } from './google-identity'
 import { useAuthActions } from './use-auth'
 
@@ -157,6 +159,20 @@ export function LoginPage() {
     }
   }
 
+  const handleGuest = async (password: string) => {
+    setPending('guest')
+    setError(null)
+    try {
+      const session = await callApi('auth.guestLogin', { password })
+      await signIn(session.token, { expiresAt: session.expiresAt })
+      void navigate(from, { replace: true })
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setPending(null)
+    }
+  }
+
   const notice = error ?? (reason ? REASON_MESSAGE[reason] : null)
 
   return (
@@ -198,6 +214,20 @@ export function LoginPage() {
                 {pending && (
                   <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" /> 認証しています…
+                  </p>
+                )}
+              </div>
+            )}
+            {guestLoginAvailable && (
+              <div className="mt-5 border-t pt-4">
+                <GuestPasswordLogin
+                  pending={pending === 'guest'}
+                  onSubmit={(p) => void handleGuest(p)}
+                />
+                {env.useMock && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    モックのパスワード：
+                    <code className="rounded bg-muted px-1">{MOCK_GUEST_PASSWORD}</code>
                   </p>
                 )}
               </div>

@@ -22,6 +22,12 @@ export interface HealthStatus {
   serverTime: string
 }
 
+/** ゲスト（パスワード入場）で発行されるトークン。expiresAt は失効時刻（ミリ秒） */
+export interface GuestLoginResult {
+  token: string
+  expiresAt: number
+}
+
 export interface Me {
   id: string
   email: string

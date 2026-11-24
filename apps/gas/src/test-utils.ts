@@ -5,7 +5,7 @@ import {
   type ApiResponse,
   type ApiResult,
 } from '@kyonan/shared'
-import { createMockApi, encodeRow, TABLES, type Row } from './core'
+import { createMockApi, encodeRow, TABLES, type AppConfig, type Row } from './core'
 
 export const GROUP = 'g-u9'
 export const OTHER_GROUP = 'g-u10'
@@ -96,14 +96,18 @@ export const ITEM_KEYS = [
 export const scoresOf = (v: number | null) => Object.fromEntries(ITEM_KEYS.map((k) => [k, v]))
 
 export function createTestApi(
-  options: { bootstrapAdminEmail?: string; fixture?: Record<string, Row[]> } = {},
+  options: {
+    bootstrapAdminEmail?: string
+    fixture?: Record<string, Row[]>
+    config?: Partial<AppConfig>
+  } = {},
 ) {
   let counter = 0
   let clock = Date.parse('2026-06-01T00:00:00.000Z')
   const api = createMockApi(options.fixture ?? buildFixture(), {
     now: () => new Date(clock),
     uuid: () => `u${++counter}`,
-    config: { bootstrapAdminEmail: options.bootstrapAdminEmail ?? null },
+    config: { bootstrapAdminEmail: options.bootstrapAdminEmail ?? null, ...options.config },
   })
   let reqCounter = 0
   function call<A extends ApiAction>(
@@ -113,9 +117,11 @@ export function createTestApi(
     requestId = `req-${++reqCounter}-xxxx`,
   ): ApiResponse<ApiResult<A>> {
     clock += 1000
-    return api.handle(
-      JSON.stringify({ action, requestId, idToken: as === null ? null : `mock:${as}`, payload }),
-    ) as ApiResponse<ApiResult<A>>
+    // as が "guest." で始まる場合はゲストトークンをそのまま送る
+    const idToken = as === null ? null : as.startsWith('guest.') ? as : `mock:${as}`
+    return api.handle(JSON.stringify({ action, requestId, idToken, payload })) as ApiResponse<
+      ApiResult<A>
+    >
   }
   function ok<A extends ApiAction>(
     as: string,
@@ -126,5 +132,13 @@ export function createTestApi(
     if (!res.success) throw new Error(`${action} failed: ${res.error.code} ${res.error.message}`)
     return res.data
   }
-  return { api, call, ok }
+  return {
+    api,
+    call,
+    ok,
+    /** テスト用の時計を進める */
+    advance: (ms: number) => {
+      clock += ms
+    },
+  }
 }

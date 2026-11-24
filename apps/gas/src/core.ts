@@ -4,6 +4,7 @@
  */
 import { handleRequest, type ApiDeps } from './api/dispatcher'
 import { MockIdTokenVerifier } from './auth/mock-id-token-verifier'
+import { hmacSha256Hex } from './infrastructure/hmac'
 import { MemoryCache, type AppConfig, type Runtime } from './infrastructure/runtime'
 import { MemoryTableStore, type Row } from './infrastructure/table-store'
 
@@ -34,6 +35,7 @@ export function createMemoryRuntime(options: MemoryRuntimeOptions = {}): Runtime
     uuid: options.uuid ?? defaultUuid,
     withLock: (fn) => fn(),
     cache: new MemoryCache(() => now().getTime()),
+    hmacSha256Hex,
     fetchText: () => {
       throw new Error('fetchText is not available in memory runtime')
     },
@@ -42,6 +44,7 @@ export function createMemoryRuntime(options: MemoryRuntimeOptions = {}): Runtime
       googleClientId: 'mock-client-id',
       schemaVersion: '1',
       bootstrapAdminEmail: null,
+      guestViewerPassword: null,
       ...options.config,
     },
     logError: (message, error) => console.error(message, error),
