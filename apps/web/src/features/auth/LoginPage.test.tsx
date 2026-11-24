@@ -37,7 +37,7 @@ function renderLogin() {
 }
 
 describe('パスワード入場（検証環境のみ）', () => {
-  it('正しいパスワードで、ログインせずに閲覧者として入れる', async () => {
+  it('正しいパスワードで、ログインせずにコーチとして入れる', async () => {
     const user = userEvent.setup()
     const router = renderLogin()
     await user.type(screen.getByPlaceholderText('パスワード'), MOCK_GUEST_PASSWORD)
@@ -45,7 +45,7 @@ describe('パスワード入場（検証環境のみ）', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
     const { me, idToken, expiresAt } = useAuthStore.getState()
-    expect(me).toMatchObject({ role: 'viewer', displayName: 'ゲスト（閲覧）' })
+    expect(me).toMatchObject({ role: 'coach', displayName: 'ゲスト（コーチ）' })
     expect(idToken).toMatch(/^guest\./)
     expect(expiresAt).toBeGreaterThan(Date.now())
   })

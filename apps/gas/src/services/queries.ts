@@ -11,6 +11,7 @@ import {
 } from '@kyonan/shared'
 import { notFound } from '../api/errors'
 import { canAccessGroup, type Actor } from '../auth/authorization'
+import { GUEST_ID, GUEST_NAME } from '../auth/guest-auth'
 import type { Db } from '../repositories/db'
 
 export function loadAllCriteria(db: Db): CriteriaDefinition[] {
@@ -145,4 +146,11 @@ export function groupName(db: Db, groupId: string): string {
 export function average(values: number[]): number | null {
   if (values.length === 0) return null
   return values.reduce((a, b) => a + b, 0) / values.length
+}
+
+/** コーチ ID → 表示名。登録コーチに加えて、パスワード入場のゲストも解決する */
+export function coachNames(db: Db): Map<string, string> {
+  const names = new Map(db.coaches.all().map((c) => [c.id, c.displayName]))
+  if (!names.has(GUEST_ID)) names.set(GUEST_ID, GUEST_NAME)
+  return names
 }

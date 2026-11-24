@@ -8,7 +8,7 @@ export function createMockHandlers(options: { latencyMs?: number; now?: () => Da
   // バックエンドの services/api 層を同一コードのままインメモリで動かす（S-11）
   const api = createMockApi(buildMockDataset(), {
     now: options.now,
-    config: { guestViewerPassword: MOCK_GUEST_PASSWORD },
+    config: { guestPassword: MOCK_GUEST_PASSWORD },
   })
   return [
     http.post(env.apiUrl, async ({ request }) => {

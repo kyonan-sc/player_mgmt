@@ -5,21 +5,27 @@ import type { Db } from '../repositories/db'
 import type { Actor } from './authorization'
 
 /**
- * 検証環境（staging / mock）専用の「パスワード入場（閲覧者）」。
+ * 検証環境（staging / mock）専用の「パスワード入場（ゲスト・コーチ）」。
  *
  * - パスワードの照合と入場の可否は必ずバックエンドで行う（フロントエンドのコードは公開されるため）。
- * - 発行するのは短命の署名付きトークンのみ。読み取り専用の閲覧者としてのみ動作し、変更系 API は拒否する。
+ * - 発行するのは短命の署名付きトークンのみ。ロールは常にコーチ（全学年の担当）。
+ *   許可する変更操作は評価の保存・提出のみで、選手・評価期間・設定などの管理操作は拒否する。
  * - APP_ENV が staging / mock 以外（本番）では、パスワードが設定されていても一切動作しない。
+ * - 全員が同じゲスト ID を共有するため、評価者は「ゲスト（コーチ）」1名として記録される。
  */
 
 export const GUEST_TOKEN_PREFIX = 'guest.'
 export const GUEST_TOKEN_TTL_SECONDS = 4 * 60 * 60
 export const GUEST_PASSWORD_MIN_LENGTH = 8
+/** ゲストに許可する変更系 API（それ以外はロールの判定より前に拒否する） */
+export const GUEST_ALLOWED_MUTATIONS: readonly string[] = ['assessments.save', 'assessments.submit']
 const ALLOWED_ENVS = ['staging', 'mock']
 const MAX_FAILURES = 10
 const FAILURE_WINDOW_SECONDS = 600
 const FAILURE_KEY = 'guest:failures'
-const GUEST_ID = 'guest-viewer'
+export const GUEST_ID = 'guest-coach'
+export const GUEST_EMAIL = `${GUEST_ID}@guest.invalid`
+export const GUEST_NAME = 'ゲスト（コーチ）'
 
 /** 文字列を処理時間が内容に依存しない方法で比較する */
 export function constantTimeEquals(a: string, b: string): boolean {
@@ -31,17 +37,18 @@ export function constantTimeEquals(a: string, b: string): boolean {
 
 /** ゲスト入場が有効か（環境が staging / mock で、十分な長さのパスワードが設定されている） */
 export function guestLoginEnabled(runtime: Runtime): boolean {
-  const { appEnv, guestViewerPassword } = runtime.config
+  const { appEnv, guestPassword } = runtime.config
   return (
     ALLOWED_ENVS.includes(appEnv) &&
-    typeof guestViewerPassword === 'string' &&
-    guestViewerPassword.length >= GUEST_PASSWORD_MIN_LENGTH
+    typeof guestPassword === 'string' &&
+    guestPassword.length >= GUEST_PASSWORD_MIN_LENGTH
   )
 }
 
 export const isGuestToken = (token: string) => token.startsWith(GUEST_TOKEN_PREFIX)
 
-const signingKey = (runtime: Runtime) => `${runtime.config.guestViewerPassword}|guest-viewer-v1`
+// 署名鍵の用途名を変えて、閲覧者時代に発行済みのトークンを無効にする
+const signingKey = (runtime: Runtime) => `${runtime.config.guestPassword}|guest-coach-v1`
 const sign = (runtime: Runtime, body: string) => runtime.hmacSha256Hex(signingKey(runtime), body)
 
 const unauthenticated = (message = '認証に失敗しました') => new AppError('UNAUTHENTICATED', message)
@@ -61,7 +68,7 @@ export function loginWithPassword(
       '試行回数が多すぎます。しばらく待ってから再度お試しください。',
     )
   }
-  if (!constantTimeEquals(password, runtime.config.guestViewerPassword ?? '')) {
+  if (!constantTimeEquals(password, runtime.config.guestPassword ?? '')) {
     runtime.cache.put(FAILURE_KEY, String(failures + 1), FAILURE_WINDOW_SECONDS)
     throw unauthenticated('パスワードが正しくありません')
   }
@@ -92,9 +99,9 @@ export function guestActor(db: Db, now: Date): Actor {
   const coach: Coach = {
     id: GUEST_ID,
     googleSub: null,
-    email: `${GUEST_ID}@guest.invalid`,
-    displayName: 'ゲスト（閲覧）',
-    role: 'viewer',
+    email: GUEST_EMAIL,
+    displayName: GUEST_NAME,
+    role: 'coach',
     status: 'active',
     createdAt: iso,
     updatedAt: iso,

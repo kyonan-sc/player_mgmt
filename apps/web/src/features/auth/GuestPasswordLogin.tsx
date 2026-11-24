@@ -18,12 +18,12 @@ export function GuestPasswordLogin({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-2" aria-label="パスワードで閲覧">
+    <form onSubmit={submit} className="space-y-2" aria-label="パスワードで入場">
       <label
         htmlFor="guest-password"
         className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
       >
-        <Eye className="size-3.5" /> パスワードで閲覧（検証環境のみ）
+        <Eye className="size-3.5" /> パスワードで入る（検証環境のみ）
       </label>
       <div className="flex gap-2">
         <Input
@@ -41,7 +41,7 @@ export function GuestPasswordLogin({
         </Button>
       </div>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        閲覧専用です。評価の入力・編集や設定の変更はできません。
+        コーチ権限で入ります。評価の入力はできますが、選手・評価期間・設定の管理（管理者の操作）はできません。入力した評価は検証用データに保存されます。
       </p>
     </form>
   )

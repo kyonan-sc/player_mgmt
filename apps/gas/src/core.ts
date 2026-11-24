@@ -44,7 +44,7 @@ export function createMemoryRuntime(options: MemoryRuntimeOptions = {}): Runtime
       googleClientId: 'mock-client-id',
       schemaVersion: '1',
       bootstrapAdminEmail: null,
-      guestViewerPassword: null,
+      guestPassword: null,
       ...options.config,
     },
     logError: (message, error) => console.error(message, error),

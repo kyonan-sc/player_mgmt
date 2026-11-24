@@ -12,7 +12,7 @@ import { conflict, invalid, notFound } from '../api/errors'
 import { audit, nowIso, requireAdmin, type Ctx } from '../auth/authorization'
 import type { Db } from '../repositories/db'
 import type { AppSettingRow } from '../repositories/schema'
-import { loadAllCriteria, loadCriteria } from './queries'
+import { coachNames, loadAllCriteria, loadCriteria } from './queries'
 
 // ---- 評価基準 ----
 
@@ -186,7 +186,7 @@ export function updateSettings(ctx: Ctx, input: ApiPayload<'settings.update'>): 
 
 export function listAudit(ctx: Ctx, limit: number): AuditLogView[] {
   requireAdmin(ctx.actor)
-  const names = new Map(ctx.db.coaches.all().map((c) => [c.id, c.displayName]))
+  const names = coachNames(ctx.db)
   return ctx.db.auditLogs
     .all()
     .slice()

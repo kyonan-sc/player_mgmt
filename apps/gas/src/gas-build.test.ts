@@ -116,7 +116,7 @@ describe('GAS バンドル', () => {
   })
 
   it('パスワード入場：staging では GAS 形式の HMAC で署名したトークンを発行し、誤ったパスワードは拒否する', () => {
-    const ctx = gasSandbox({ APP_ENV: 'staging', GUEST_VIEWER_PASSWORD: 'stg-guest-pass-2026' })
+    const ctx = gasSandbox({ APP_ENV: 'staging', GUEST_PASSWORD: 'stg-guest-pass-2026' })
     vm.runInContext(code, ctx)
     const ok = call(ctx, 'auth.guestLogin', { password: 'stg-guest-pass-2026' })
     expect(ok.success).toBe(true)
@@ -126,7 +126,7 @@ describe('GAS バンドル', () => {
     })
   })
 
-  it('パスワード入場：本番（APP_ENV=production）ではパスワードが設定されていても拒否する', () => {
+  it('パスワード入場：本番（APP_ENV=production）ではパスワードが設定されていても拒否する（旧名 GUEST_VIEWER_PASSWORD も同様）', () => {
     const ctx = gasSandbox({ APP_ENV: 'production', GUEST_VIEWER_PASSWORD: 'stg-guest-pass-2026' })
     vm.runInContext(code, ctx)
     expect(call(ctx, 'auth.guestLogin', { password: 'stg-guest-pass-2026' })).toMatchObject({

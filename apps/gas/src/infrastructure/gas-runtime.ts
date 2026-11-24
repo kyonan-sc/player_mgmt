@@ -11,7 +11,9 @@ export function readConfig(): AppConfig {
     googleClientId: props.getProperty('GOOGLE_CLIENT_ID') ?? '',
     schemaVersion: props.getProperty('SCHEMA_VERSION') ?? SCHEMA_VERSION,
     bootstrapAdminEmail: props.getProperty('BOOTSTRAP_ADMIN_EMAIL'),
-    guestViewerPassword: props.getProperty('GUEST_VIEWER_PASSWORD'),
+    // 旧名 GUEST_VIEWER_PASSWORD も読み取る（互換）
+    guestPassword:
+      props.getProperty('GUEST_PASSWORD') ?? props.getProperty('GUEST_VIEWER_PASSWORD'),
   }
 }
 

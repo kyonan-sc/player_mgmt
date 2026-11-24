@@ -102,19 +102,32 @@ test('閲覧者は管理画面・評価入力にアクセスできない', async
   await expect(page.getByText('コーチコメント')).toHaveCount(0)
 })
 
-test('パスワードで閲覧者として入れ、閲覧のみ・管理画面は拒否される', async ({ page, isMobile }) => {
+test('パスワードでコーチとして入れ、評価を入力できる（管理画面は拒否される）', async ({
+  page,
+  isMobile,
+}) => {
   await page.goto('#/login')
   await page.getByPlaceholder('パスワード').fill('guest-demo')
   await page.getByRole('button', { name: '入る' }).click()
   await expect(page.getByRole('heading', { name: 'ダッシュボード' })).toBeVisible()
   if (!isMobile) await expect(page.getByRole('link', { name: 'システム設定' })).toHaveCount(0)
 
+  // 管理者の操作は表示されず、画面に直接アクセスしても拒否される
   await page.goto('#/players')
   await expect(page.getByRole('link', { name: '選手を登録' })).toHaveCount(0)
   await page.goto('#/settings')
   await expect(page.getByText('この画面を表示する権限がありません')).toBeVisible()
-  await page.goto('#/assessments/cycle-7/players/player-01')
+  await page.goto('#/settings/coaches')
   await expect(page.getByText('この画面を表示する権限がありません')).toBeVisible()
+
+  // コーチ権限で評価を入力・提出できる
+  await page.goto('#/assessments/cycle-7/players/player-21')
+  await expect(page.getByRole('radiogroup').first()).toBeVisible()
+  for (const group of await page.getByRole('radiogroup').all()) {
+    await group.getByRole('radio', { name: /^3点/ }).click()
+  }
+  await page.getByRole('button', { name: /^提出$/ }).click()
+  await expect(page.getByText('評価を提出しました')).toBeVisible()
 })
 
 test('成長グラフ・レーダーチャートを表示できる', async ({ page }) => {

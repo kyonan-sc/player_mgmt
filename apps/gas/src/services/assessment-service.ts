@@ -32,6 +32,7 @@ import {
   finalizedResultsByPlayer,
   groupName,
   loadCriteria,
+  coachNames,
   previousResult,
   scoreDiff,
 } from './queries'
@@ -166,7 +167,7 @@ export function getAssessmentHistory(ctx: Ctx, playerId: string): AssessmentHist
   if (!player) throw notFound('選手')
   requireGroupAccess(actor, player.groupId)
   const cycles = new Map(db.cycles.filter((c) => c.status === 'finalized').map((c) => [c.id, c]))
-  const coaches = new Map(db.coaches.all().map((c) => [c.id, c.displayName]))
+  const coaches = coachNames(db)
   return db.assessments
     .filter((a) => a.playerId === playerId && a.status === 'submitted' && cycles.has(a.cycleId))
     .map((assessment) => {

@@ -15,8 +15,8 @@ export interface AppConfig {
   googleClientId: string
   schemaVersion: string
   bootstrapAdminEmail: string | null
-  /** 検証環境専用のゲスト閲覧用パスワード。未設定ならゲスト入場は無効 */
-  guestViewerPassword: string | null
+  /** 検証環境専用のゲスト入場用パスワード。未設定ならゲスト入場は無効 */
+  guestPassword: string | null
 }
 
 /** 実行環境（GAS / テスト / ブラウザ内モック）に依存する機能の抽象 */
