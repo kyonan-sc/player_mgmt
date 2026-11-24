@@ -7,3 +7,5 @@ docs/01_*.md
 docs/02_*.md
 apps/gas/src/entrypoints/self-test-fixture.ts
 apps/web/src/hooks
+docs/media
+docs/05_*.md

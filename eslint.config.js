@@ -44,4 +44,9 @@ export default tseslint.config(
     files: ['apps/gas/**/*.ts', 'packages/**/*.ts', '**/*.config.ts', '**/scripts/**/*.mjs'],
     languageOptions: { globals: { ...globals.node } },
   },
+  {
+    // Playwright の page.evaluate 等でブラウザ側のコードを含む
+    files: ['tools/**/*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
 )
