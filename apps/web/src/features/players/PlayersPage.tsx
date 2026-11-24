@@ -32,98 +32,104 @@ import {
 import { useMe } from '@/features/auth/use-me'
 import { formatDate, formatScore } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { useGroups, usePlayers } from './api'
-
-const CATEGORY_COLUMNS = [
-  { key: 'TEC', label: '技術力' },
-  { key: 'DEC', label: '判断力' },
-  { key: 'DUE', label: '対人' },
-  { key: 'INV', label: '関与' },
-]
+import { useCriteriaList, useGroups, usePlayers } from './api'
+import { categoryColumnsFor, type CategoryColumn } from './category-columns'
 
 const scoreOrNull = (v: number | null | undefined) => (typeof v === 'number' ? v : null)
 /** null を常に末尾に並べるソート */
 const nullsLast = (a: number | null, b: number | null) =>
   a === null ? (b === null ? 0 : 1) : b === null ? -1 : a - b
 
-const columns: ColumnDef<PlayerListItem>[] = [
-  {
-    id: 'jersey',
-    header: '背番号',
-    accessorFn: (r) => r.player.jerseyNumber,
-    sortingFn: (a, b) => nullsLast(a.original.player.jerseyNumber, b.original.player.jerseyNumber),
-    cell: ({ row }) => (
-      <span className="num text-muted-foreground">{row.original.player.jerseyNumber ?? '—'}</span>
-    ),
-  },
-  {
-    id: 'name',
-    header: '選手名',
-    accessorFn: (r) => r.player.displayName,
-    cell: ({ row }) => (
-      <span className="font-medium">
-        {row.original.player.displayName}
-        {row.original.player.status === 'inactive' && (
-          <span className="ml-2 text-xs text-muted-foreground">退団</span>
-        )}
-      </span>
-    ),
-  },
-  { id: 'group', header: '学年', accessorFn: (r) => r.groupName },
-  {
-    id: 'team',
-    header: '所属',
-    accessorFn: (r) => r.currentTeam ?? 'Z',
-    cell: ({ row }) => <TeamBadge team={row.original.currentTeam} emptyLabel="未編成" size="sm" />,
-  },
-  {
-    id: 'total',
-    header: '総合',
-    accessorFn: (r) => scoreOrNull(r.latest?.totalScore),
-    sortingFn: (a, b) =>
-      nullsLast(
-        scoreOrNull(a.original.latest?.totalScore),
-        scoreOrNull(b.original.latest?.totalScore),
+function buildColumns(categories: CategoryColumn[]): ColumnDef<PlayerListItem>[] {
+  return [
+    {
+      id: 'jersey',
+      header: '背番号',
+      accessorFn: (r) => r.player.jerseyNumber,
+      sortingFn: (a, b) =>
+        nullsLast(a.original.player.jerseyNumber, b.original.player.jerseyNumber),
+      cell: ({ row }) => (
+        <span className="num text-muted-foreground">{row.original.player.jerseyNumber ?? '—'}</span>
       ),
-    cell: ({ row }) => (
-      <span className="num font-semibold">{formatScore(row.original.latest?.totalScore)}</span>
-    ),
-  },
-  {
-    id: 'diff',
-    header: '前回差',
-    accessorFn: (r) => r.diff,
-    sortingFn: (a, b) => nullsLast(a.original.diff, b.original.diff),
-    cell: ({ row }) => <ScoreDelta value={row.original.diff} />,
-  },
-  ...CATEGORY_COLUMNS.map<ColumnDef<PlayerListItem>>((c) => ({
-    id: c.key,
-    header: c.label,
-    accessorFn: (r) => scoreOrNull(r.latest?.categoryScores[c.key]),
-    sortingFn: (a, b) =>
-      nullsLast(
-        scoreOrNull(a.original.latest?.categoryScores[c.key]),
-        scoreOrNull(b.original.latest?.categoryScores[c.key]),
+    },
+    {
+      id: 'name',
+      header: '選手名',
+      accessorFn: (r) => r.player.displayName,
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.original.player.displayName}
+          {row.original.player.status === 'inactive' && (
+            <span className="ml-2 text-xs text-muted-foreground">退団</span>
+          )}
+        </span>
       ),
-    cell: ({ row }) => (
-      <span className="num">{formatScore(row.original.latest?.categoryScores[c.key])}</span>
-    ),
-  })),
-  {
-    id: 'lastDate',
-    header: '最終評価日',
-    accessorFn: (r) => r.latest?.cycleEndDate ?? '',
-    cell: ({ row }) => (
-      <span className="num text-muted-foreground">
-        {formatDate(row.original.latest?.cycleEndDate)}
-      </span>
-    ),
-  },
-]
+    },
+    { id: 'group', header: '学年', accessorFn: (r) => r.groupName },
+    {
+      id: 'team',
+      header: '所属',
+      accessorFn: (r) => r.currentTeam ?? 'Z',
+      cell: ({ row }) => (
+        <TeamBadge team={row.original.currentTeam} emptyLabel="未編成" size="sm" />
+      ),
+    },
+    {
+      id: 'total',
+      header: '総合',
+      accessorFn: (r) => scoreOrNull(r.latest?.totalScore),
+      sortingFn: (a, b) =>
+        nullsLast(
+          scoreOrNull(a.original.latest?.totalScore),
+          scoreOrNull(b.original.latest?.totalScore),
+        ),
+      cell: ({ row }) => (
+        <span className="num font-semibold">{formatScore(row.original.latest?.totalScore)}</span>
+      ),
+    },
+    {
+      id: 'diff',
+      header: '前回差',
+      accessorFn: (r) => r.diff,
+      sortingFn: (a, b) => nullsLast(a.original.diff, b.original.diff),
+      cell: ({ row }) => <ScoreDelta value={row.original.diff} />,
+    },
+    ...categories.map<ColumnDef<PlayerListItem>>((c) => ({
+      id: c.key,
+      header: c.label,
+      accessorFn: (r) => scoreOrNull(r.latest?.categoryScores[c.key]),
+      sortingFn: (a, b) =>
+        nullsLast(
+          scoreOrNull(a.original.latest?.categoryScores[c.key]),
+          scoreOrNull(b.original.latest?.categoryScores[c.key]),
+        ),
+      cell: ({ row }) => (
+        <span className="num">{formatScore(row.original.latest?.categoryScores[c.key])}</span>
+      ),
+    })),
+    {
+      id: 'lastDate',
+      header: '最終評価日',
+      accessorFn: (r) => r.latest?.cycleEndDate ?? '',
+      cell: ({ row }) => (
+        <span className="num text-muted-foreground">
+          {formatDate(row.original.latest?.cycleEndDate)}
+        </span>
+      ),
+    },
+  ]
+}
 
-function PlayerTable({ rows }: { rows: PlayerListItem[] }) {
+function PlayerTable({
+  rows,
+  categories,
+}: {
+  rows: PlayerListItem[]
+  categories: CategoryColumn[]
+}) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'jersey', desc: false }])
   const navigate = useNavigate()
+  const columns = useMemo(() => buildColumns(categories), [categories])
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table は React Compiler の自動メモ化対象外
   const table = useReactTable({
     data: rows,
@@ -137,7 +143,7 @@ function PlayerTable({ rows }: { rows: PlayerListItem[] }) {
   return (
     <>
       {/* PC：全項目のテーブル */}
-      <div className="hidden overflow-hidden rounded-xl border bg-card shadow-card md:block">
+      <div className="hidden overflow-x-auto rounded-xl border bg-card shadow-card md:block">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -234,6 +240,12 @@ export function PlayersPage() {
   const [search, setSearch] = useState('')
   const groups = useGroups()
   const query = usePlayers({ status, groupId: groupId === 'all' ? undefined : groupId })
+  const criteria = useCriteriaList()
+  // 絞り込みで列が変わらないよう、取得した全選手を基準に列を決める
+  const categories = useMemo(
+    () => categoryColumnsFor(query.data ?? [], criteria.data ?? []),
+    [query.data, criteria.data],
+  )
 
   const filter = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -338,7 +350,7 @@ export function PlayersPage() {
           return (
             <>
               <p className="mb-2 text-xs text-muted-foreground">{rows.length}名</p>
-              <PlayerTable rows={rows} />
+              <PlayerTable rows={rows} categories={categories} />
             </>
           )
         }}
