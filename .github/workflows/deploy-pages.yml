@@ -38,6 +38,8 @@ jobs:
     if: needs.check-config.outputs.configured == 'true'
     runs-on: ubuntu-latest
     steps:
+      # Pages が有効になっていない場合、ビルドの前にここで止めて原因を分かりやすく示す
+      - uses: actions/configure-pages@v5
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
