@@ -71,4 +71,10 @@ describe('GAS バンドル', () => {
       error: { code: 'UNAUTHENTICATED' },
     })
   })
+
+  it('検証用データ投入は APP_ENV=staging 以外では何もせず拒否する', () => {
+    const ctx = gasSandbox()
+    vm.runInContext(code, ctx)
+    expect(() => vm.runInContext('seedStagingDemoData()', ctx)).toThrow(/APP_ENV=staging/)
+  })
 })

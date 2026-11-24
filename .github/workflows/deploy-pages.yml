@@ -53,6 +53,8 @@ jobs:
           VITE_USE_MOCK: 'false'
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          # GitHub Pages のプロジェクト URL（https://<org>.github.io/<repo>/）に合わせる
+          VITE_BASE: /${{ github.event.repository.name }}/
         run: pnpm --filter @kyonan/web build
       - uses: actions/upload-pages-artifact@v3
         with:

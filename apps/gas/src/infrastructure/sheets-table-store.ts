@@ -137,6 +137,28 @@ export class SheetsTableStore implements TableStore {
   }
 }
 
+/**
+ * 全テーブルのデータ行を消去し、投入予定の行数分をテキスト書式で確保する（検証環境のデータ再投入専用）。
+ * 行を追加するとテキスト書式が適用されず日付等が自動変換されるため、事前に確保する。
+ */
+export function resetAllTableData(
+  spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet,
+  cache: CacheLike,
+  plannedRows: Record<string, number>,
+): void {
+  for (const def of ALL_TABLES) {
+    const sheet = spreadsheet.getSheetByName(def.name)
+    if (!sheet) throw new Error(`Sheet not found: ${def.name}. Run setupSheets().`)
+    const lastRow = sheet.getLastRow()
+    if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, sheet.getMaxColumns()).clearContent()
+    const needed = (plannedRows[def.name] ?? 0) + 1
+    if (sheet.getMaxRows() < needed)
+      sheet.insertRowsAfter(sheet.getMaxRows(), needed - sheet.getMaxRows())
+    sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).setNumberFormat('@')
+    cache.remove(`tbl:${def.name}`)
+  }
+}
+
 /** シート初期化・マイグレーション。不足しているシート・カラムを追加し、既存データは変更しない。 */
 export function ensureSchema(spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet): string[] {
   const log: string[] = []

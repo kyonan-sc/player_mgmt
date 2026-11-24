@@ -5,6 +5,7 @@ import { SheetsTableStore, ensureSchema } from '../infrastructure/sheets-table-s
 import { SCHEMA_VERSION } from '../repositories/schema'
 import { seedInitialData } from './setup'
 import { runSelfTest as selfTest } from './self-test'
+import { seedStagingDemoData } from './demo-seed'
 
 function json(body: unknown): GoogleAppsScript.Content.TextOutput {
   return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(
@@ -58,3 +59,5 @@ export function setupSheets(): string[] {
 export function runSelfTest(): string[] {
   return selfTest()
 }
+
+export { seedStagingDemoData }

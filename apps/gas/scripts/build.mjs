@@ -3,7 +3,7 @@
 import { build } from 'esbuild'
 import { copyFileSync, mkdirSync } from 'node:fs'
 
-const ENTRYPOINTS = ['doGet', 'doPost', 'setupSheets', 'runSelfTest']
+const ENTRYPOINTS = ['doGet', 'doPost', 'setupSheets', 'runSelfTest', 'seedStagingDemoData']
 
 mkdirSync('dist', { recursive: true })
 await build({
