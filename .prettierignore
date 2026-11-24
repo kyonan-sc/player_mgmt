@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+dist
+coverage
+apps/web/public/mockServiceWorker.js
+apps/web/src/components/ui
+docs/01_*.md
+docs/02_*.md
+apps/gas/src/entrypoints/self-test-fixture.ts
+apps/web/src/hooks

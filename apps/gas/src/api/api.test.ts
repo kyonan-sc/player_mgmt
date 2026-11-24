@@ -1,0 +1,263 @@
+import { describe, expect, it } from 'vitest'
+import { EMAILS, GROUP, createTestApi, scoresOf } from '../test-utils'
+
+const errorCode = (res: { success: boolean; error?: { code: string } }) =>
+  res.success ? 'OK' : res.error!.code
+
+function openCycle(t: ReturnType<typeof createTestApi>, minEvaluatorCount = 2) {
+  const cycle = t.ok(EMAILS.admin, 'cycles.create', {
+    groupId: GROUP,
+    name: '2026年6月評価',
+    startDate: '2026-06-01',
+    endDate: '2026-06-14',
+    criteriaVersionId: 'cv1',
+    minEvaluatorCount,
+  })
+  t.ok(EMAILS.admin, 'cycles.open', { id: cycle.id })
+  return cycle.id
+}
+
+const draft = (
+  cycleId: string,
+  playerId: string,
+  score: number | null,
+  expectedRevision: number | null = null,
+) => ({
+  cycleId,
+  playerId,
+  scores: scoresOf(score),
+  strengths: '',
+  improvementPoints: '',
+  comment: '',
+  expectedRevision,
+})
+
+describe('認証・リクエスト検証', () => {
+  it('health.check は認証不要', () => {
+    const t = createTestApi()
+    expect(t.call(null, 'health.check').success).toBe(true)
+  })
+
+  it('トークンなしは UNAUTHENTICATED、未登録アカウントと無効化アカウントは FORBIDDEN', () => {
+    const t = createTestApi()
+    expect(errorCode(t.call(null, 'auth.me'))).toBe('UNAUTHENTICATED')
+    expect(errorCode(t.call('stranger@example.com', 'auth.me'))).toBe('FORBIDDEN')
+    expect(errorCode(t.call(EMAILS.inactive, 'auth.me'))).toBe('FORBIDDEN')
+  })
+
+  it('初回ログインで sub を紐付け、操作履歴に記録する', () => {
+    const t = createTestApi()
+    expect(t.ok(EMAILS.coach, 'auth.me')).toMatchObject({
+      id: 'c-coach',
+      role: 'coach',
+      groupIds: [GROUP],
+    })
+    const coach = t.api.store.readAll('coaches').find((c) => c.id === 'c-coach')
+    expect(coach?.googleSub).toBe(`mock-sub-${EMAILS.coach}`)
+    expect(t.api.store.readAll('audit_logs').some((l) => l.action === 'auth.linkAccount')).toBe(
+      true,
+    )
+  })
+
+  it('有効な管理者がいない場合のみ BOOTSTRAP_ADMIN_EMAIL を管理者として登録する', () => {
+    const t = createTestApi({ bootstrapAdminEmail: 'owner@example.com', fixture: { coaches: [] } })
+    expect(t.ok('owner@example.com', 'auth.me').role).toBe('admin')
+    const t2 = createTestApi({ bootstrapAdminEmail: 'owner@example.com' })
+    expect(errorCode(t2.call('owner@example.com', 'auth.me'))).toBe('FORBIDDEN')
+  })
+
+  it('不正な payload・不明な action は VALIDATION_ERROR（詳細を返す）', () => {
+    const t = createTestApi()
+    const res = t.call(EMAILS.admin, 'players.create', { displayName: '' } as never)
+    expect(errorCode(res)).toBe('VALIDATION_ERROR')
+    expect(!res.success && res.error.details?.length).toBeGreaterThan(0)
+    expect(errorCode(t.call(EMAILS.admin, 'unknown.action' as never))).toBe('VALIDATION_ERROR')
+  })
+})
+
+describe('認可', () => {
+  it('選手登録は管理者のみ', () => {
+    const t = createTestApi()
+    const input = {
+      displayName: '新入団',
+      jerseyNumber: 10,
+      enrollmentGrade: 3,
+      enrollmentYear: 2026,
+      groupId: GROUP,
+      joinedDate: null,
+      status: 'active' as const,
+    }
+    expect(errorCode(t.call(EMAILS.coach, 'players.create', input))).toBe('FORBIDDEN')
+    expect(t.ok(EMAILS.admin, 'players.create', input).displayName).toBe('新入団')
+  })
+
+  it('担当外グループの選手は一覧に出ず、詳細取得は FORBIDDEN', () => {
+    const t = createTestApi()
+    expect(t.ok(EMAILS.coach, 'players.list', {}).map((p) => p.player.id)).toEqual(['p1', 'p2'])
+    expect(errorCode(t.call(EMAILS.coach, 'players.get', { id: 'p3' }))).toBe('FORBIDDEN')
+    expect(t.ok(EMAILS.admin, 'players.list', {})).toHaveLength(3)
+  })
+
+  it('viewer は評価入力・評価状況・コメントを閲覧できない', () => {
+    const t = createTestApi()
+    const cycleId = openCycle(t)
+    expect(errorCode(t.call(EMAILS.viewer, 'assessments.save', draft(cycleId, 'p1', 3)))).toBe(
+      'FORBIDDEN',
+    )
+    expect(errorCode(t.call(EMAILS.viewer, 'assessments.list', { cycleId }))).toBe('FORBIDDEN')
+    expect(errorCode(t.call(EMAILS.viewer, 'assessments.getHistory', { playerId: 'p1' }))).toBe(
+      'FORBIDDEN',
+    )
+    expect(t.ok(EMAILS.viewer, 'cycles.list', {})).toHaveLength(0)
+  })
+
+  it('最後の有効な管理者は無効化・降格できない', () => {
+    const t = createTestApi()
+    const res = t.call(EMAILS.admin, 'coaches.update', {
+      id: 'c-admin',
+      email: EMAILS.admin,
+      displayName: 'admin',
+      role: 'coach',
+      groupIds: [],
+      status: 'active',
+    })
+    expect(errorCode(res)).toBe('CONFLICT')
+  })
+})
+
+describe('評価フロー', () => {
+  it('下書き → 提出 → 確定 → 集計結果', () => {
+    const t = createTestApi()
+    const cycleId = openCycle(t)
+
+    const saved = t.ok(EMAILS.coach, 'assessments.save', {
+      ...draft(cycleId, 'p1', 4),
+      scores: { 'TEC-01': 4 },
+    })
+    expect(saved).toMatchObject({ status: 'draft', revision: 1 })
+    expect(saved.scores['INV-02']).toBeNull()
+
+    // 未入力項目があると提出できない
+    const missing = t.call(EMAILS.coach, 'assessments.submit', {
+      ...draft(cycleId, 'p1', 4, 1),
+      scores: { 'TEC-01': 4 },
+    })
+    expect(errorCode(missing)).toBe('VALIDATION_ERROR')
+
+    t.ok(EMAILS.coach, 'assessments.submit', draft(cycleId, 'p1', 4, 1))
+    t.ok(EMAILS.coach2, 'assessments.submit', draft(cycleId, 'p1', 5))
+    t.ok(EMAILS.coach, 'assessments.submit', draft(cycleId, 'p2', 3))
+
+    // 確定前は一般コーチに結果を見せない。管理者は暫定集計を確認できる
+    expect(errorCode(t.call(EMAILS.coach, 'results.list', { cycleId }))).toBe('FORBIDDEN')
+    const preview = t.ok(EMAILS.admin, 'results.list', { cycleId })
+    expect(preview.preview).toBe(true)
+
+    // 評価不足の選手（p2）がいる場合は明示的な確認が必要
+    expect(errorCode(t.call(EMAILS.admin, 'cycles.finalize', { id: cycleId }))).toBe(
+      'VALIDATION_ERROR',
+    )
+    const finalized = t.ok(EMAILS.admin, 'cycles.finalize', {
+      id: cycleId,
+      acknowledgeInsufficient: true,
+    })
+    expect(finalized.status).toBe('finalized')
+
+    const results = t.ok(EMAILS.coach, 'results.list', { cycleId })
+    const p1 = results.rows.find((r) => r.player.id === 'p1')!
+    const p2 = results.rows.find((r) => r.player.id === 'p2')!
+    expect(p1.result).toMatchObject({
+      totalScore: 90,
+      recommendedTeam: 'A',
+      status: 'complete',
+      evaluatorCount: 2,
+    })
+    expect(p2.result).toMatchObject({
+      totalScore: 60,
+      recommendedTeam: null,
+      status: 'insufficient',
+    })
+
+    // 確定後は変更不可・再確定は冪等
+    expect(errorCode(t.call(EMAILS.coach, 'assessments.save', draft(cycleId, 'p1', 1, 2)))).toBe(
+      'CONFLICT',
+    )
+    t.ok(EMAILS.admin, 'cycles.finalize', { id: cycleId })
+    expect(t.api.store.readAll('assessment_results')).toHaveLength(2)
+
+    // 確定後はコーチがコメント履歴を閲覧できる
+    expect(t.ok(EMAILS.coach, 'assessments.getHistory', { playerId: 'p1' })).toHaveLength(2)
+  })
+
+  it('提出済み評価を下書き保存すると下書きに戻る。revision 不一致は CONFLICT', () => {
+    const t = createTestApi()
+    const cycleId = openCycle(t)
+    t.ok(EMAILS.coach, 'assessments.submit', draft(cycleId, 'p1', 4))
+    expect(t.ok(EMAILS.coach, 'assessments.save', draft(cycleId, 'p1', 3, 1)).status).toBe('draft')
+    expect(errorCode(t.call(EMAILS.coach, 'assessments.save', draft(cycleId, 'p1', 3, 1)))).toBe(
+      'CONFLICT',
+    )
+    expect(errorCode(t.call(EMAILS.coach, 'assessments.save', draft(cycleId, 'p1', 3, null)))).toBe(
+      'CONFLICT',
+    )
+  })
+
+  it('同じ requestId の再送は同じ結果を返し、重複登録しない', () => {
+    const t = createTestApi()
+    const payload = {
+      groupId: GROUP,
+      name: 'x',
+      startDate: '2026-06-01',
+      endDate: '2026-06-02',
+      criteriaVersionId: 'cv1',
+    }
+    const a = t.call(EMAILS.admin, 'cycles.create', payload, 'same-request-id')
+    const b = t.call(EMAILS.admin, 'cycles.create', payload, 'same-request-id')
+    expect(b).toEqual(a)
+    expect(t.api.store.readAll('assessment_cycles')).toHaveLength(1)
+  })
+})
+
+describe('チーム編成・評価基準', () => {
+  it('推奨と異なるチームには理由が必須。履歴は追加される', () => {
+    const t = createTestApi()
+    const cycleId = openCycle(t, 1)
+    t.ok(EMAILS.coach, 'assessments.submit', draft(cycleId, 'p1', 3))
+    t.ok(EMAILS.admin, 'cycles.finalize', { id: cycleId, acknowledgeInsufficient: true })
+
+    const base = { playerId: 'p1', effectiveDate: '2026-06-20' }
+    expect(errorCode(t.call(EMAILS.admin, 'teams.assign', { ...base, assignedTeam: 'A' }))).toBe(
+      'VALIDATION_ERROR',
+    )
+    t.ok(EMAILS.admin, 'teams.assign', { ...base, assignedTeam: 'B' })
+    t.ok(EMAILS.admin, 'teams.assign', { ...base, assignedTeam: 'A', reason: 'ポジションバランス' })
+    const board = t.ok(EMAILS.coach, 'teams.list', {})
+    expect(board.players.find((p) => p.player.id === 'p1')).toMatchObject({
+      currentTeam: 'A',
+      recommendedTeam: 'B',
+    })
+    expect(board.history).toHaveLength(2)
+    expect(errorCode(t.call(EMAILS.coach, 'teams.assign', { ...base, assignedTeam: 'B' }))).toBe(
+      'FORBIDDEN',
+    )
+  })
+
+  it('配点合計が100点でない評価基準は作成できない', () => {
+    const t = createTestApi()
+    const res = t.call(EMAILS.admin, 'criteria.createVersion', {
+      version: 'v2',
+      name: 'test',
+      thresholdA: 80,
+      thresholdB: 60,
+      categories: [
+        {
+          categoryKey: 'TEC',
+          name: '技術',
+          weight: 90,
+          items: [{ itemKey: 'T1', name: 'a', description: '', rubric: {} }],
+        },
+      ],
+    })
+    expect(errorCode(res)).toBe('VALIDATION_ERROR')
+  })
+})

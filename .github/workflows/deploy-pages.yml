@@ -1,0 +1,53 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - name: Build (production)
+        # VITE_ で始まる値は公開情報（ビルド成果物に含まれる）。Repository / Environment Variables に設定する。
+        env:
+          VITE_APP_ENV: production
+          VITE_USE_MOCK: 'false'
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          test -n "$VITE_API_URL" || (echo "VITE_API_URL is not set" && exit 1)
+          test -n "$VITE_GOOGLE_CLIENT_ID" || (echo "VITE_GOOGLE_CLIENT_ID is not set" && exit 1)
+          pnpm --filter @kyonan/web build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

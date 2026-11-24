@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Build GAS bundle
+        run: pnpm --filter @kyonan/gas build
+      - name: Build web (mock)
+        run: pnpm --filter @kyonan/web build:mock
+      - name: E2E (mock)
+        run: |
+          pnpm --filter @kyonan/web exec playwright install --with-deps chromium
+          pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

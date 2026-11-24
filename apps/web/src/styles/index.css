@@ -1,0 +1,159 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/inter';
+
+/*
+ * 境南SC デザイントークン（アプリ要件仕様書 9.2〜9.4）
+ * Light / Clear / Chic / Minimal。深いグリーンを基調に、彩度を抑えた配色で情報階層を表現する。
+ */
+
+@theme inline {
+  --font-sans:
+    'Inter Variable', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI',
+    'Meiryo', system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand-accent: var(--brand-accent);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-team-a: var(--team-a);
+  --color-team-b: var(--team-b);
+  --color-team-c: var(--team-c);
+  --color-team-none: var(--team-none);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.25);
+  --radius-2xl: calc(var(--radius) * 1.5);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.5);
+
+  --shadow-card: 0 1px 2px 0 rgb(24 33 43 / 0.04), 0 1px 3px 0 rgb(24 33 43 / 0.03);
+}
+
+:root {
+  --background: #f7f8fa;
+  --foreground: #18212b;
+  --card: #ffffff;
+  --card-foreground: #18212b;
+  --popover: #ffffff;
+  --popover-foreground: #18212b;
+  --primary: #214e48;
+  --primary-hover: #193e39;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f0;
+  --secondary-foreground: #18212b;
+  --muted: #f1f3f5;
+  --muted-foreground: #6b7280;
+  /* shadcn の accent は「ホバー面」の意味で使われるため、ブランドのアクセント色は別名で定義する */
+  --accent: #eef3f1;
+  --accent-foreground: #193e39;
+  --brand-accent: #527d74;
+  --destructive: #b94a48;
+  --success: #25805a;
+  --warning: #b7791f;
+  --border: #e5e7eb;
+  --input: #dfe2e6;
+  --ring: #527d74;
+
+  --team-a: #315c91;
+  --team-b: #568477;
+  --team-c: #8a8497;
+  --team-none: #9ca3af;
+
+  --chart-1: #214e48;
+  --chart-2: #527d74;
+  --chart-3: #315c91;
+  --chart-4: #b7791f;
+  --chart-5: #8a8497;
+
+  --radius: 0.625rem;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #18212b;
+  --sidebar-primary: #214e48;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef3f1;
+  --sidebar-accent-foreground: #193e39;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #527d74;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground text-[15px] leading-relaxed;
+  }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  /* 数値は等幅数字で表示し、桁の揃いと比較のしやすさを優先する */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
