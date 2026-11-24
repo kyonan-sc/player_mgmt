@@ -112,6 +112,7 @@ pnpm exec clasp redeploy <DEPLOYMENT_ID> -d "v0.x.x"   # 既存デプロイを�
 3. Settings → Secrets and variables → Actions → **Variables** に以下を登録します（公開情報のため Secret でなくてよい）。
    - `VITE_API_URL`（production の GAS URL）
    - `VITE_GOOGLE_CLIENT_ID`
+   - VITE_APP_ENV（任意）。未設定は production。ステージング用に公開し、パスワード入場の入力欄を出したい場合のみ staging を設定する（接続先の GAS の APP_ENV も staging であること）
 4. `main` への push で `Deploy to GitHub Pages` ワークフローが実行されます。
 
 ## 9. 初期データの登録

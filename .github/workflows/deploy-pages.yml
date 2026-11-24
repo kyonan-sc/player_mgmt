@@ -51,7 +51,9 @@ jobs:
       - name: Build (production)
         # VITE_ で始まる値は公開情報（ビルド成果物に含まれる）。Repository Variables に設定する。
         env:
-          VITE_APP_ENV: production
+          # 公開サイトの環境名。未設定は production（パスワード入場の入力欄は出ない）。
+          # ステージング用に公開する場合のみ、Repository Variables に VITE_APP_ENV=staging を設定する。
+          VITE_APP_ENV: ${{ vars.VITE_APP_ENV || 'production' }}
           VITE_USE_MOCK: 'false'
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
