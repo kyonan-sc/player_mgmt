@@ -58,22 +58,45 @@ interface MutationOptions<A extends ApiAction> {
 /**
  * 変更系 API。requestId を呼び出しごとに発行し、成功後は関連するキャッシュを無効化する。
  * 小規模データのため、整合性を優先して全クエリを再取得する。
+ *
+ * 保存に 0.4 秒以上かかるときは「保存しています…」のトーストを出し、結果が出たら成功・失敗の通知に置き換える。
+ * ダイアログが閉じる操作（在籍終了・確定など）でも、処理中であることが分かるようにするため。
  */
+const SAVING_TOAST_DELAY_MS = 400
+
 export function useApiMutation<A extends ApiAction>(action: A, options: MutationOptions<A> = {}) {
   const queryClient = useQueryClient()
-  return useMutation<ApiResult<A>, ApiClientError, ApiPayloadInput<A>>({
+  return useMutation<
+    ApiResult<A>,
+    ApiClientError,
+    ApiPayloadInput<A>,
+    { toastId: string; timer: number }
+  >({
     mutationFn: (payload) => callApi(action, payload, { requestId: newRequestId() }),
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'auth.me' })
+    onMutate: () => {
+      const toastId = `saving-${newRequestId()}`
+      const timer = window.setTimeout(
+        () => toast.loading('保存しています…', { id: toastId, duration: Infinity }),
+        SAVING_TOAST_DELAY_MS,
+      )
+      return { toastId, timer }
+    },
+    onSuccess: async (data, _vars, ctx) => {
+      window.clearTimeout(ctx?.timer)
       const message =
         typeof options.successMessage === 'function'
           ? options.successMessage(data)
           : options.successMessage
-      if (message) toast.success(message)
+      // 保存の完了を先に知らせ、そのあとで最新データの再取得を待つ
+      if (message) toast.success(message, { id: ctx?.toastId })
+      else if (ctx) toast.dismiss(ctx.toastId)
+      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'auth.me' })
       options.onSuccess?.(data)
     },
-    onError: (error) => {
-      if (!options.silentError) toast.error(error.message)
+    onError: (error, _vars, ctx) => {
+      window.clearTimeout(ctx?.timer)
+      if (!options.silentError) toast.error(error.message, { id: ctx?.toastId })
+      else if (ctx) toast.dismiss(ctx.toastId)
     },
   })
 }

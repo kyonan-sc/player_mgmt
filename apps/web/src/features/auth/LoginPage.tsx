@@ -4,7 +4,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { MockBanner } from '@/components/layout/AppShell'
 import { BrandMark } from '@/components/layout/BrandMark'
 import { Button } from '@/components/ui/button'
-import { errorMessage } from '@/lib/api-client'
+import { callApi, errorMessage } from '@/lib/api-client'
 import { env } from '@/lib/env'
 import { cn } from '@/lib/utils'
 import { MOCK_USERS } from '@/mocks/mock-users'
@@ -136,6 +136,11 @@ export function LoginPage() {
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const from = (location.state as { from?: string } | null)?.from ?? '/'
+
+  // アカウントを選ぶ間にバックエンドを起こしておき、ログイン直後の待ち時間を短くする
+  useEffect(() => {
+    if (!env.useMock) void callApi('health.check', {}).catch(() => {})
+  }, [])
 
   if (me) return <Navigate to={from} replace />
 

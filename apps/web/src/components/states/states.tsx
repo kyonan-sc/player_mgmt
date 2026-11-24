@@ -1,5 +1,5 @@
 import type { UseQueryResult } from '@tanstack/react-query'
-import { AlertTriangle, FileQuestion, Inbox, Lock, RefreshCw, WifiOff } from 'lucide-react'
+import { AlertTriangle, FileQuestion, Inbox, Loader2, Lock, RefreshCw, WifiOff } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -128,7 +128,10 @@ export function ErrorState({
 
 export function LoadingState({ rows = 4, className }: { rows?: number; className?: string }) {
   return (
-    <div className={cn('space-y-3', className)} aria-busy="true" aria-label="読み込み中">
+    <div className={cn('space-y-3', className)} aria-busy="true">
+      <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden /> データを読み込んでいます…
+      </p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
           <Skeleton key={i} className="h-24 rounded-xl" />

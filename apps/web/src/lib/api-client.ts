@@ -1,5 +1,6 @@
 import type { ApiAction, ApiError, ApiPayloadInput, ApiResponse, ApiResult } from '@kyonan/shared'
 import { env } from '@/lib/env'
+import { useNetworkActivity } from '@/lib/network-activity'
 import { useAuthStore } from '@/stores/auth-store'
 
 export type ClientErrorCode = ApiError['code'] | 'NETWORK_ERROR'
@@ -22,14 +23,35 @@ export function newRequestId(): string {
 
 const PUBLIC_ACTIONS: ApiAction[] = ['health.check']
 
+interface CallOptions {
+  requestId?: string
+  signal?: AbortSignal
+  idToken?: string | null
+}
+
+/** リクエストの実行中は、画面全体の待機表示（NetworkStatus）に反映する */
+export async function callApi<A extends ApiAction>(
+  action: A,
+  payload: ApiPayloadInput<A>,
+  options: CallOptions = {},
+): Promise<ApiResult<A>> {
+  const activity = useNetworkActivity.getState()
+  const id = activity.begin()
+  try {
+    return await request(action, payload, options)
+  } finally {
+    activity.end(id)
+  }
+}
+
 /**
  * GAS Web App への RPC 呼び出し（技術仕様 8.1）。
  * プリフライトを避けるため text/plain で送信し、独自ヘッダーは使用しない。ID Token はボディに含める。
  */
-export async function callApi<A extends ApiAction>(
+async function request<A extends ApiAction>(
   action: A,
   payload: ApiPayloadInput<A>,
-  options: { requestId?: string; signal?: AbortSignal; idToken?: string | null } = {},
+  options: CallOptions,
 ): Promise<ApiResult<A>> {
   const requestId = options.requestId ?? newRequestId()
   const idToken = PUBLIC_ACTIONS.includes(action)

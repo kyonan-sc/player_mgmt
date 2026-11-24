@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { createHashRouter, Navigate, RouterProvider, type RouteObject } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
+import { NetworkStatus } from '@/components/layout/NetworkStatus'
 import { LoadingState, NotFoundState } from '@/components/states/states'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -161,8 +162,15 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={200}>
+        <NetworkStatus />
         <RouterProvider router={router} />
-        <Toaster position="top-center" closeButton />
+        {/* 通信待ちのメッセージ（NetworkStatus）と重ならないよう、トーストは少し下に出す */}
+        <Toaster
+          position="top-center"
+          offset={{ top: 72 }}
+          mobileOffset={{ top: 72 }}
+          closeButton
+        />
       </TooltipProvider>
     </QueryClientProvider>
   )
