@@ -15,29 +15,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  # バックエンド（GAS）の接続先が未設定の間はデプロイしない。モックや空の接続先で本番を公開しないため。
+  check-config:
     runs-on: ubuntu-latest
-    environment: production
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
     steps:
-      - uses: actions/checkout@v4
+      - id: check
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          if [ -n "$VITE_API_URL" ] && [ -n "$VITE_GOOGLE_CLIENT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Pages deploy skipped::Repository Variables の VITE_API_URL / VITE_GOOGLE_CLIENT_ID が未設定のため、デプロイをスキップしました（docs/04_Google環境セットアップ手順書.md §8）。"
+          fi
+
+  build:
+    needs: check-config
+    if: needs.check-config.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - name: Build (production)
-        # VITE_ で始まる値は公開情報（ビルド成果物に含まれる）。Repository / Environment Variables に設定する。
+        # VITE_ で始まる値は公開情報（ビルド成果物に含まれる）。Repository Variables に設定する。
         env:
           VITE_APP_ENV: production
           VITE_USE_MOCK: 'false'
           VITE_API_URL: ${{ vars.VITE_API_URL }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-        run: |
-          test -n "$VITE_API_URL" || (echo "VITE_API_URL is not set" && exit 1)
-          test -n "$VITE_GOOGLE_CLIENT_ID" || (echo "VITE_GOOGLE_CLIENT_ID is not set" && exit 1)
-          pnpm --filter @kyonan/web build
+        run: pnpm --filter @kyonan/web build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/web/dist
