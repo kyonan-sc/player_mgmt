@@ -1,4 +1,4 @@
-import { buildInitialCriteria } from '@kyonan/shared'
+import { buildStandardCriteria } from '@kyonan/shared'
 import type { Runtime } from '../infrastructure/runtime'
 import type { TableStore } from '../infrastructure/table-store'
 import { createDb } from '../repositories/db'
@@ -7,7 +7,7 @@ import { createDb } from '../repositories/db'
 export function seedInitialData(store: TableStore, runtime: Runtime): string[] {
   const db = createDb(store)
   if (db.criteriaVersions.all().length > 0) return ['criteria: already initialized']
-  const criteria = buildInitialCriteria(runtime.uuid(), runtime.now().toISOString(), 'system')
+  const criteria = buildStandardCriteria(runtime.uuid(), runtime.now().toISOString(), 'system')
   db.criteriaVersions.insert(criteria.version)
   for (const { items, ...category } of criteria.categories) {
     db.criteriaCategories.insert(category)

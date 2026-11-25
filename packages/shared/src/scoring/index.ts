@@ -1,5 +1,11 @@
 import { SCORE_MAX, SCORE_MIN, SPREAD_WARNING_THRESHOLD, TOTAL_WEIGHT } from '../constants'
-import type { CriteriaDefinition, ItemScores, ResultStatus, Team } from '../types/entities'
+import type {
+  CriteriaDefinition,
+  CriteriaItem,
+  ItemScores,
+  ResultStatus,
+  Team,
+} from '../types/entities'
 
 /** 小数第1位に丸める（第2位で四捨五入、2進浮動小数誤差を補正）。S-03 */
 export function roundScore(value: number): number {
@@ -10,24 +16,64 @@ export function isValidScoreLevel(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= SCORE_MIN && (value as number) <= SCORE_MAX
 }
 
+/** 項目の満点。未設定（旧データ）は 5 段階として扱う */
+export const itemMax = (item: Pick<CriteriaItem, 'maxScore'>): number =>
+  item.maxScore > 0 ? item.maxScore : SCORE_MAX
+
+/** その項目の段階（1〜満点の整数）として有効な値か */
+export function isValidItemScore(
+  value: unknown,
+  item: Pick<CriteriaItem, 'maxScore'>,
+): value is number {
+  return (
+    Number.isInteger(value) && (value as number) >= SCORE_MIN && (value as number) <= itemMax(item)
+  )
+}
+
 export function listItemKeys(criteria: CriteriaDefinition): string[] {
   return criteria.categories.flatMap((c) => c.items.map((i) => i.itemKey))
 }
 
+export function listItems(criteria: CriteriaDefinition): CriteriaItem[] {
+  return criteria.categories.flatMap((c) => c.items)
+}
+
+/** 提出に必須の項目（未観察を許可していない項目） */
+export function listRequiredItems(criteria: CriteriaDefinition): CriteriaItem[] {
+  return listItems(criteria).filter((i) => !i.allowUnobserved)
+}
+
+/** 未入力の必須項目。未観察を許可した項目は、未入力（未観察）でも不足にならない */
 export function findMissingItems(criteria: CriteriaDefinition, scores: ItemScores): string[] {
-  return listItemKeys(criteria).filter((key) => !isValidScoreLevel(scores[key]))
+  return listRequiredItems(criteria)
+    .filter((item) => !isValidItemScore(scores[item.itemKey], item))
+    .map((item) => item.itemKey)
+}
+
+/** 評価基準で許されない値（満点を超える点数など）が入力されている項目 */
+export function findInvalidItems(criteria: CriteriaDefinition, scores: ItemScores): string[] {
+  return listItems(criteria)
+    .filter((item) => {
+      const value = scores[item.itemKey]
+      return value !== null && value !== undefined && !isValidItemScore(value, item)
+    })
+    .map((item) => item.itemKey)
 }
 
 export interface ScoreBreakdown {
-  /** カテゴリ得点（丸めなし）。カテゴリ内の全項目が揃っていない場合は null */
+  /** カテゴリ得点（丸めなし）。必須項目が揃っていない、または全項目が未観察のカテゴリは null */
   categoryScores: Record<string, number | null>
-  /** 総合得点（小数第1位）。全カテゴリが揃っていない場合は null */
+  /** 総合得点（小数第1位）。必須項目が揃っていない場合は null */
   totalScore: number | null
 }
 
 /**
  * 項目スコア（または項目別平均点）からカテゴリ得点と総合得点を計算する。
- * カテゴリ得点 = 項目得点の平均 ÷ 5 × カテゴリ配点。途中の丸めは行わない。
+ *
+ * - カテゴリ得点 = 観察できた項目の「得点 ÷ 項目の満点」の平均 × カテゴリ配点。途中の丸めは行わない。
+ * - 全項目が未観察のカテゴリは得点を出さず、総合は観察できたカテゴリの配点で100点に換算する。
+ *   （全カテゴリを観察できた場合は、配点合計100点のためそのままの合計になる）
+ * - 必須項目（未観察を許可していない項目）が未入力のカテゴリがある場合、総合は出さない。
  */
 export function computeScores(
   criteria: CriteriaDefinition,
@@ -35,20 +81,41 @@ export function computeScores(
 ): ScoreBreakdown {
   const categoryScores: Record<string, number | null> = {}
   let total = 0
+  let observedWeight = 0
   let complete = true
   for (const category of criteria.categories) {
-    const values = category.items.map((i) => itemScores[i.itemKey])
-    if (values.length === 0 || values.some((v) => typeof v !== 'number' || Number.isNaN(v))) {
+    const items = category.items
+    const valueOf = (item: CriteriaItem) => {
+      const v = itemScores[item.itemKey]
+      return typeof v === 'number' && !Number.isNaN(v) ? v : null
+    }
+    if (items.length === 0 || items.some((i) => !i.allowUnobserved && valueOf(i) === null)) {
       categoryScores[category.categoryKey] = null
       complete = false
       continue
     }
-    const avg = (values as number[]).reduce((a, b) => a + b, 0) / values.length
-    const score = (avg / SCORE_MAX) * category.weight
+    const observed = items.flatMap((i) => {
+      const v = valueOf(i)
+      return v === null ? [] : [{ v, max: itemMax(i) }]
+    })
+    if (observed.length === 0) {
+      categoryScores[category.categoryKey] = null
+      continue
+    }
+    // 満点が同じ項目だけなら「平均 ÷ 満点」（従来どおり）。満点が混在する場合は項目ごとの達成率の平均
+    const sameMax = observed.every((o) => o.max === observed[0]!.max)
+    const ratio = sameMax
+      ? observed.reduce((a, o) => a + o.v, 0) / observed.length / observed[0]!.max
+      : observed.reduce((a, o) => a + o.v / o.max, 0) / observed.length
+    const score = ratio * category.weight
     categoryScores[category.categoryKey] = score
     total += score
+    observedWeight += category.weight
   }
-  return { categoryScores, totalScore: complete ? roundScore(total) : null }
+  if (!complete || observedWeight <= 0) return { categoryScores, totalScore: null }
+  const normalized =
+    observedWeight === TOTAL_WEIGHT ? total : (total / observedWeight) * TOTAL_WEIGHT
+  return { categoryScores, totalScore: roundScore(normalized) }
 }
 
 export function judgeTeam(
@@ -88,18 +155,25 @@ export function aggregateAssessments(
   submittedScores: ItemScores[],
   minEvaluatorCount: number,
 ): AggregatedResult {
-  const itemKeys = listItemKeys(criteria)
-  const valid = submittedScores.filter((s) => itemKeys.every((k) => isValidScoreLevel(s[k])))
+  const items = listItems(criteria)
+  // 必須項目がすべて入力された評価だけを集計対象にする（未観察を許可した項目は null でもよい）
+  const valid = submittedScores.filter(
+    (s) => findMissingItems(criteria, s).length === 0 && findInvalidItems(criteria, s).length === 0,
+  )
   const evaluatorCount = valid.length
   const itemScores: Record<string, number> = {}
   const spreads: ItemSpread[] = []
   if (evaluatorCount > 0) {
-    for (const key of itemKeys) {
-      const values = valid.map((s) => s[key] as number)
-      itemScores[key] = values.reduce((a, b) => a + b, 0) / values.length
+    for (const item of items) {
+      // 項目を観察した評価者だけの平均。誰も観察していない項目は集計から除く
+      const values = valid
+        .map((s) => s[item.itemKey])
+        .filter((v): v is number => isValidItemScore(v, item))
+      if (values.length === 0) continue
+      itemScores[item.itemKey] = values.reduce((a, b) => a + b, 0) / values.length
       const min = Math.min(...values)
       const max = Math.max(...values)
-      spreads.push({ itemKey: key, min, max, spread: max - min })
+      spreads.push({ itemKey: item.itemKey, min, max, spread: max - min })
     }
   }
   const breakdown = evaluatorCount > 0 ? computeScores(criteria, itemScores) : null

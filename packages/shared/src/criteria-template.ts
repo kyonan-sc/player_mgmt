@@ -1,23 +1,28 @@
-import { DEFAULT_THRESHOLD_A, DEFAULT_THRESHOLD_B, INITIAL_CRITERIA } from './constants'
+import {
+  DEFAULT_THRESHOLD_A,
+  DEFAULT_THRESHOLD_B,
+  INITIAL_CRITERIA,
+  STANDARD_CRITERIA,
+  type CriteriaTemplateCategory,
+} from './constants'
 import type { CriteriaDefinition } from './types/entities'
 
-/** 初期評価基準を CriteriaDefinition として構築する（テスト・シード・初期化で使用） */
-export function buildInitialCriteria(
-  versionId = 'criteria-v1',
-  createdAt = '2026-01-01T00:00:00.000Z',
-  createdBy = 'system',
+function buildFromTemplate(
+  template: CriteriaTemplateCategory[],
+  meta: { versionId: string; version: string; name: string; createdAt: string; createdBy: string },
 ): CriteriaDefinition {
+  const { versionId } = meta
   return {
     version: {
       id: versionId,
-      version: 'v1',
-      name: '初期評価基準',
+      version: meta.version,
+      name: meta.name,
       thresholdA: DEFAULT_THRESHOLD_A,
       thresholdB: DEFAULT_THRESHOLD_B,
-      createdAt,
-      createdBy,
+      createdAt: meta.createdAt,
+      createdBy: meta.createdBy,
     },
-    categories: INITIAL_CRITERIA.map((c, ci) => {
+    categories: template.map((c, ci) => {
       const categoryId = `${versionId}-${c.categoryKey}`
       return {
         id: categoryId,
@@ -34,8 +39,41 @@ export function buildInitialCriteria(
           description: item.description,
           rubric: item.rubric,
           sortOrder: ii + 1,
+          maxScore: item.maxScore ?? 5,
+          allowUnobserved: item.allowUnobserved ?? false,
         })),
       }
     }),
   }
+}
+
+/** 基本の4カテゴリ・9項目（要件仕様 3章の初期評価基準）。テスト・デモの履歴で使用する */
+export function buildInitialCriteria(
+  versionId = 'criteria-v1',
+  createdAt = '2026-01-01T00:00:00.000Z',
+  createdBy = 'system',
+): CriteriaDefinition {
+  return buildFromTemplate(INITIAL_CRITERIA, {
+    versionId,
+    version: 'v1',
+    name: '初期評価基準',
+    createdAt,
+    createdBy,
+  })
+}
+
+/** 標準の評価基準：基本の4カテゴリ（配点調整）＋「練習への取り組み」（3段階・未観察あり）。新規環境の初期データ */
+export function buildStandardCriteria(
+  versionId = 'criteria-standard',
+  createdAt = '2026-01-01T00:00:00.000Z',
+  createdBy = 'system',
+  options: { version?: string; name?: string } = {},
+): CriteriaDefinition {
+  return buildFromTemplate(STANDARD_CRITERIA, {
+    versionId,
+    version: options.version ?? 'v1',
+    name: options.name ?? '標準評価基準',
+    createdAt,
+    createdBy,
+  })
 }

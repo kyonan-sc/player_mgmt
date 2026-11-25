@@ -95,7 +95,10 @@ function ItemDetailTable({ detail }: { detail: PlayerDetail }) {
                           <p className="font-medium">{item.name}</p>
                           <p className="mt-1 text-muted-foreground">{item.description}</p>
                           <dl className="mt-3 space-y-1.5">
-                            {(['5', '3', '1'] as const).map((lv) => (
+                            {(item.maxScore === 3
+                              ? (['3', '2', '1'] as const)
+                              : (['5', '3', '1'] as const)
+                            ).map((lv) => (
                               <div key={lv} className="flex gap-2">
                                 <dt className="num w-8 shrink-0 font-semibold">{lv}点</dt>
                                 <dd className="text-muted-foreground">{item.rubric[lv] ?? '—'}</dd>
@@ -108,6 +111,11 @@ function ItemDetailTable({ detail }: { detail: PlayerDetail }) {
                   </TableCell>
                   <TableCell className="num text-right font-semibold">
                     {formatScore(cur, 2)}
+                    {cur != null && item.maxScore === 3 && (
+                      <span className="ml-0.5 text-[11px] font-normal text-muted-foreground">
+                        /3
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="num text-right text-muted-foreground">
                     {formatScore(before, 2)}

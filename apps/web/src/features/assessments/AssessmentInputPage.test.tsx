@@ -66,24 +66,30 @@ beforeEach(() => {
 })
 
 describe('評価入力画面（SCR-08）', () => {
-  it('初期状態は全項目が未選択で、提出できない', async () => {
+  it('初期状態は必須項目が未選択で、提出できない', async () => {
     signInAs(COACH)
     renderInput('/assessments/cycle-7/players/player-20')
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
     const radios = await screen.findAllByRole('radio')
-    expect(radios).toHaveLength(45)
-    expect(radios.every((r) => r.getAttribute('aria-checked') === 'false')).toBe(true)
+    // 5段階の9項目×5 + 練習への取り組み4項目×（3段階＋未観察）
+    expect(radios).toHaveLength(61)
+    const scored = radios.filter((r) => !/^未観察/.test(r.getAttribute('aria-label') ?? ''))
+    expect(scored.every((r) => r.getAttribute('aria-checked') === 'false')).toBe(true)
     expect(screen.getByRole('button', { name: /^提出$/ })).toBeDisabled()
     expect(screen.getByText('あと9項目で表示')).toBeInTheDocument()
   })
 
-  it('全9項目を入力すると総合得点が表示され、提出するとバックエンドに保存される', async () => {
+  it('必須の9項目を入力すると総合得点が表示され、未観察のまま提出するとバックエンドに保存される', async () => {
     const user = userEvent.setup()
     signInAs(COACH)
     renderInput('/assessments/cycle-7/players/player-20')
     const groups = await screen.findAllByRole('radiogroup')
-    for (const group of groups) await user.click(within(group).getByRole('radio', { name: /^3点/ }))
+    for (const group of groups) {
+      if (within(group).queryByRole('radio', { name: /^未観察/ })) continue
+      await user.click(within(group).getByRole('radio', { name: /^3点/ }))
+    }
 
+    // 練習への取り組みが全て未観察なら、観察できたカテゴリだけで100点換算する
     expect(screen.getByText('60.0')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^提出$/ }))
 
@@ -91,6 +97,15 @@ describe('評価入力画面（SCR-08）', () => {
     await waitFor(() => expect(screen.getByText('提出済み')).toBeInTheDocument())
   })
 
+  it('練習への取り組みは3段階で入力でき、点数が総合得点に反映される', async () => {
+    const user = userEvent.setup()
+    signInAs(COACH)
+    renderInput('/assessments/cycle-7/players/player-20')
+    const groups = await screen.findAllByRole('radiogroup')
+    for (const group of groups) await user.click(within(group).getByRole('radio', { name: /^3点/ }))
+    // 4カテゴリ60%（配点90）＋練習への取り組み100%（配点10）
+    expect(screen.getByText('64.0')).toBeInTheDocument()
+  })
   it('一部のみ入力した場合は下書き保存でき、未入力のまま次へ進める', async () => {
     const user = userEvent.setup()
     signInAs(COACH)

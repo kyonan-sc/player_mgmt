@@ -28,7 +28,9 @@ export function loadAllCriteria(db: Db): CriteriaDefinition[] {
           ...c,
           items: items
             .filter((i) => i.categoryId === c.id)
-            .sort((a, b) => a.sortOrder - b.sortOrder),
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            // 列追加前の既存データは、5段階・未観察なしとして扱う
+            .map((i) => ({ ...i, maxScore: i.maxScore > 0 ? i.maxScore : 5 })),
         })),
     }))
 }

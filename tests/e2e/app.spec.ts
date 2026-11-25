@@ -33,10 +33,13 @@ test('コーチが選手を評価して提出できる', async ({ page }) => {
   const playerName = await page.getByRole('heading', { level: 1 }).innerText()
   await expect(page.getByRole('button', { name: /^提出$/ })).toBeDisabled()
 
+  // 5段階の項目は4点、3段階の「練習への取り組み」は「自分で（3点）」を選ぶ
   for (const group of await page.getByRole('radiogroup').all()) {
-    await group.getByRole('radio', { name: /^4点/ }).click()
+    const threeLevel = (await group.getByRole('radio', { name: /^未観察/ }).count()) > 0
+    await group.getByRole('radio', { name: threeLevel ? /^3点/ : /^4点/ }).click()
   }
-  await expect(page.getByText('80.0', { exact: true })).toBeVisible()
+  // 4カテゴリ80%（配点90）＋練習への取り組み100%（配点10）
+  await expect(page.getByText('82.0', { exact: true })).toBeVisible()
   await page.getByLabel('強み').fill('ボールを受ける前の首振りが増えた')
   await page.getByRole('button', { name: /^提出$/ }).click()
   await expect(page.getByText('評価を提出しました')).toBeVisible()

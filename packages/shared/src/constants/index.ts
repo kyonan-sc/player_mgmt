@@ -34,6 +34,10 @@ export interface CriteriaTemplateItem {
   name: string
   description: string
   rubric: Rubric
+  /** 省略時は 5 段階 */
+  maxScore?: number
+  /** 省略時は false（未観察のまま提出できない） */
+  allowUnobserved?: boolean
 }
 
 export interface CriteriaTemplateCategory {
@@ -162,6 +166,70 @@ export const INITIAL_CRITERIA: CriteriaTemplateCategory[] = [
       },
     ],
   },
+]
+
+/** 「練習への取り組み」の3段階の判断の目安（見出しは入力ボタンの下に表示される） */
+const ENGAGEMENT_RUBRIC: Rubric = {
+  '1': 'サポートあり：コーチが一緒にやる、見本を見せるなどの支援で行動が見られる',
+  '2': '声かけで：本人への短い声かけで行動が見られる',
+  '3': '自分で：全体への説明や助言を受けたあと、個別の促しを待たずに行動が見られる',
+}
+
+/**
+ * 練習に来た日に見える行動を評価するカテゴリ。各項目は3段階＋未観察（欠席・見学・観察できる場面がない場合）。
+ * 出席率そのものは評価せず、出欠記録から別に確認する。
+ */
+export const ENGAGEMENT_CATEGORY: CriteriaTemplateCategory = {
+  categoryKey: 'ENG',
+  name: '練習への取り組み',
+  weight: 10,
+  items: [
+    {
+      itemKey: 'ENG-01',
+      name: '練習に入る',
+      description:
+        'やることが分かったら、自分の場所や順番に入って始められる（例：説明のあと、ペアを作ってパス練習を始める）',
+      rubric: ENGAGEMENT_RUBRIC,
+      maxScore: 3,
+      allowUnobserved: true,
+    },
+    {
+      itemKey: 'ENG-02',
+      name: '練習の中で動き続ける',
+      description:
+        'プレーが途切れたあとも、次にできることを見つけて関わる（例：ミニゲームでパスを出したあと、もう一度パスを受けられる場所に動く）',
+      rubric: ENGAGEMENT_RUBRIC,
+      maxScore: 3,
+      allowUnobserved: true,
+    },
+    {
+      itemKey: 'ENG-03',
+      name: '失敗してももう一度やる',
+      description:
+        '失敗したあと、次の機会にもう一度プレーに関わる（例：ボールを取られたあと、次にパスが来たときも受けにいく）',
+      rubric: ENGAGEMENT_RUBRIC,
+      maxScore: 3,
+      allowUnobserved: true,
+    },
+    {
+      itemKey: 'ENG-04',
+      name: '教わったことを試す',
+      description:
+        '練習のテーマやコーチの助言を、次のプレーで一度やってみる（例：「受ける前に後ろを見よう」と言われて、次のパスが来る前に振り返る。トラップがうまくいかなくても、試せたら評価する）',
+      rubric: ENGAGEMENT_RUBRIC,
+      maxScore: 3,
+      allowUnobserved: true,
+    },
+  ],
+}
+
+/** 標準の配点。「練習への取り組み」を加えて合計100点にするため、既存カテゴリの配点を調整する */
+const STANDARD_WEIGHTS: Record<string, number> = { TEC: 25, DEC: 20, DUE: 25, INV: 20 }
+
+/** 標準の評価基準（初期データ・新規環境の既定）：基本の4カテゴリ＋練習への取り組み */
+export const STANDARD_CRITERIA: CriteriaTemplateCategory[] = [
+  ...INITIAL_CRITERIA.map((c) => ({ ...c, weight: STANDARD_WEIGHTS[c.categoryKey] ?? c.weight })),
+  ENGAGEMENT_CATEGORY,
 ]
 
 export const ERROR_CODES = [

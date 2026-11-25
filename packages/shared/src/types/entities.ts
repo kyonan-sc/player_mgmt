@@ -97,6 +97,10 @@ export interface CriteriaItem {
   description: string
   rubric: Rubric
   sortOrder: number
+  /** 段階数（満点）。3 または 5。1〜maxScore の整数で評価する */
+  maxScore: number
+  /** true の項目は「未観察」（欠席・見学など）のまま提出できる。未観察は null で表し、平均から除く */
+  allowUnobserved: boolean
 }
 
 export interface CriteriaCategoryWithItems extends CriteriaCategory {

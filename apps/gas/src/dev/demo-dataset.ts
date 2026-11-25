@@ -1,6 +1,8 @@
 import {
   aggregateAssessments,
+  listItems,
   buildInitialCriteria,
+  buildStandardCriteria,
   type Assessment,
   type AssessmentCycle,
   type AssessmentResult,
@@ -8,6 +10,7 @@ import {
   type Coach,
   type CoachGroup,
   type CriteriaDefinition,
+  type CriteriaItem,
   type CyclePlayer,
   type Group,
   type ItemScores,
@@ -66,6 +69,8 @@ const CYCLES = [
 ]
 /** この評価期間インデックス以降は改訂基準（v2） */
 const CRITERIA_V2_FROM = 5
+/** この評価期間インデックス以降は「練習への取り組み」を加えた基準（v3） */
+const CRITERIA_V3_FROM = 7
 
 const FAMILY = [
   '佐藤',
@@ -269,6 +274,12 @@ export function buildStagingDemoDataset(
     .filter((c) => c.role !== 'admin')
     .map((c, i) => ({ id: `cg-${pad(i + 1)}`, coachId: c.id, groupId: GROUP_ID }))
 
+  const reviseWording = (c: CriteriaDefinition) => {
+    c.categories[1]!.items[0]!.description =
+      '味方・相手・スペースを、ボールを受ける前から認識しているか'
+    c.categories[3]!.items[1]!.description =
+      'ボールを失った直後に、近くの味方と連携して守備へ切り替えられるか'
+  }
   const criteriaV1 = buildInitialCriteria('criteria-v1', created, 'coach-01')
   const criteriaV2: CriteriaDefinition = buildInitialCriteria(
     'criteria-v2',
@@ -276,10 +287,18 @@ export function buildStagingDemoDataset(
     'coach-01',
   )
   criteriaV2.version = { ...criteriaV2.version, version: 'v2', name: '2026年度 改訂基準' }
-  criteriaV2.categories[1]!.items[0]!.description =
-    '味方・相手・スペースを、ボールを受ける前から認識しているか'
-  criteriaV2.categories[3]!.items[1]!.description =
-    'ボールを失った直後に、近くの味方と連携して守備へ切り替えられるか'
+  reviseWording(criteriaV2)
+  // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階＋未観察）を追加
+  const criteriaV3: CriteriaDefinition = buildStandardCriteria(
+    'criteria-v3',
+    iso(addDays(CYCLES[CRITERIA_V3_FROM]!.start, -14)),
+    'coach-01',
+    { version: 'v3', name: '2026年度 標準基準（練習への取り組みを追加）' },
+  )
+  reviseWording(criteriaV3)
+  const criteriaFor = (t: number) =>
+    t >= CRITERIA_V3_FROM ? criteriaV3 : t >= CRITERIA_V2_FROM ? criteriaV2 : criteriaV1
+  /** 5段階の項目（基本の9項目）。選手ごとの力量はこのキーで持つ */
   const itemKeys = criteriaV1.categories.flatMap((c) => c.items.map((i) => i.itemKey))
 
   const players: Player[] = Array.from({ length: 35 }, (_, i) => {
@@ -310,6 +329,9 @@ export function buildStagingDemoDataset(
         2.0 + rand() * 2.1 + (i % 7 === 0 ? 0.3 : 0) - (JOINERS[i] !== undefined ? 0.3 : 0)
       return Object.fromEntries(itemKeys.map((k) => [k, talent + (rand() - 0.5) * 0.8]))
     })(),
+    // 練習への取り組み（3段階の基準値）と、練習を欠席・見学する割合
+    engagement: 1.6 + rand() * 1.4,
+    absence: 0.04 + rand() * 0.2,
     trend: TRENDS[i % TRENDS.length]!,
     divergent: i === 4 || i === 17 || i === 26,
   }))
@@ -367,7 +389,8 @@ export function buildStagingDemoDataset(
 
   CYCLES.forEach((def, t) => {
     const isOpen = t === CYCLES.length - 1
-    const criteria = t >= CRITERIA_V2_FROM ? criteriaV2 : criteriaV1
+    const criteria = criteriaFor(t)
+    const criteriaItems = listItems(criteria)
     const cycle: AssessmentCycle = {
       id: `cycle-${pad(t + 1)}`,
       groupId: GROUP_ID,
@@ -402,6 +425,17 @@ export function buildStagingDemoDataset(
         growth(profile.trend, t - profile.joinedAt) +
         bias +
         (rand() - 0.5) * 0.9
+      /**
+       * 項目の得点を作る。3段階の項目（練習への取り組み）は、欠席・見学の日は全項目が未観察（null）、
+       * 出席していても一部の項目は観察できない（null）ことがある。
+       */
+      const scoreOf = (item: CriteriaItem, bias: number, attended: boolean): number | null => {
+        if (item.maxScore !== 3) return clampScore(level(item.itemKey, bias))
+        if (!attended || rand() < 0.1) return null
+        const v =
+          profile.engagement + 0.08 * (t - profile.joinedAt) + bias * 0.5 + (rand() - 0.5) * 1.1
+        return Math.max(1, Math.min(3, Math.round(v)))
+      }
       // 担当コーチを優先し、監督（admin）は評価機会を少なめにする
       const pool = evaluators
         .map((e) => ({ e, order: rand() + (e.def.role === 'admin' ? 0.6 : 0) }))
@@ -413,8 +447,12 @@ export function buildStagingDemoDataset(
           const r = rand()
           if (r > 0.42) continue
           const draft = r > 0.34
+          const attended = rand() > profile.absence
           const scores = Object.fromEntries(
-            itemKeys.map((k, ki) => [k, draft && ki > 4 ? null : clampScore(level(k, e.def.bias))]),
+            criteriaItems.map((item, ki) => [
+              item.itemKey,
+              draft && ki > 4 ? null : scoreOf(item, e.def.bias, attended),
+            ]),
           )
           assessments.push(
             makeAssessment(
@@ -433,11 +471,15 @@ export function buildStagingDemoDataset(
       const count = r < 0.08 ? 1 : r < 0.6 ? 2 : r < 0.93 ? 3 : 4
       const submitted: ItemScores[] = []
       pool.slice(0, count).forEach((e, ei) => {
+        const attended = rand() > profile.absence
         const scores = Object.fromEntries(
-          itemKeys.map((k) => {
-            let v = level(k, e.def.bias)
-            if (profile.divergent && ei === 0 && (k === 'DEC-01' || k === 'DUE-02')) v += 2
-            return [k, clampScore(v)]
+          criteriaItems.map((item) => {
+            const k = item.itemKey
+            const v = scoreOf(item, e.def.bias, attended)
+            if (v !== null && profile.divergent && ei === 0 && (k === 'DEC-01' || k === 'DUE-02')) {
+              return [k, clampScore(v + 2)]
+            }
+            return [k, v]
           }),
         )
         submitted.push(scores)
@@ -488,7 +530,7 @@ export function buildStagingDemoDataset(
     }
   })
 
-  const criteriaList = [criteriaV1, criteriaV2]
+  const criteriaList = [criteriaV1, criteriaV2, criteriaV3]
   const tables: Record<string, Row[]> = {
     [TABLES.groups.name]: groups.map((g) => encodeRow(TABLES.groups, g)),
     [TABLES.coaches.name]: coaches.map((c) => encodeRow(TABLES.coaches, c)),
@@ -512,7 +554,7 @@ export function buildStagingDemoDataset(
     [TABLES.appSettings.name]: [
       encodeRow(TABLES.appSettings, {
         id: 'defaultCriteriaVersionId',
-        value: 'criteria-v2',
+        value: 'criteria-v3',
         updatedAt: created,
         updatedBy: 'coach-01',
       }),

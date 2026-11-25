@@ -13,11 +13,32 @@ function json(body: unknown): GoogleAppsScript.Content.TextOutput {
   )
 }
 
+/**
+ * スキーマのバージョンが古い場合に、不足している列を追加する（既存データは変更しない）。
+ * デプロイ後の最初のリクエストで自動的に実行し、新しい列が保存されないまま運用されることを防ぐ。
+ */
+function migrateSchemaIfNeeded(
+  runtime: ReturnType<typeof createGasRuntime>,
+  spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet,
+): void {
+  if (runtime.config.schemaVersion === SCHEMA_VERSION) return
+  runtime.withLock(() => {
+    const props = PropertiesService.getScriptProperties()
+    if (props.getProperty('SCHEMA_VERSION') === SCHEMA_VERSION) return
+    const log = ensureSchema(spreadsheet)
+    props.setProperty('SCHEMA_VERSION', SCHEMA_VERSION)
+    runtime.cache.remove('tbl:criteria_items')
+    console.log(`schema migrated to v${SCHEMA_VERSION}\n${log.join('\n')}`)
+  })
+}
+
 /** API エンドポイント。Content-Type: text/plain の JSON ボディを受け付ける。 */
 export function doPost(e: GoogleAppsScript.Events.DoPost): GoogleAppsScript.Content.TextOutput {
   const runtime = createGasRuntime()
   try {
-    const store = new SheetsTableStore(openSpreadsheet(), runtime.cache)
+    const spreadsheet = openSpreadsheet()
+    migrateSchemaIfNeeded(runtime, spreadsheet)
+    const store = new SheetsTableStore(spreadsheet, runtime.cache)
     const verifier = new GoogleIdTokenVerifier(runtime, runtime.config.googleClientId)
     return json(handleRequest(e.postData?.contents ?? '', { store, runtime, verifier }))
   } catch (error) {

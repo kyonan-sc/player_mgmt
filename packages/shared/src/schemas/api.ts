@@ -116,6 +116,8 @@ export const criteriaVersionInputSchema = z.object({
                 .regex(/^[A-Z][A-Z0-9_-]{0,31}$/, '英大文字で入力してください'),
               name: nameSchema,
               description: z.string().trim().max(500),
+              maxScore: z.union([z.literal(3), z.literal(5)]),
+              allowUnobserved: z.boolean(),
               rubric: z.object({
                 '1': z.string().max(500).optional(),
                 '2': z.string().max(500).optional(),

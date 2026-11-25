@@ -1,4 +1,4 @@
-import type { CriteriaDefinition, PlayerDetail } from '@kyonan/shared'
+import { itemMax, type CriteriaDefinition, type PlayerDetail } from '@kyonan/shared'
 import { useState } from 'react'
 import {
   CartesianGrid,
@@ -120,12 +120,16 @@ export function CategoryRadar({
   )
 }
 
+/** 段階数の異なる項目を並べるための5点換算 */
+const toFiveScale = (v: number | null | undefined, max: number): number | null =>
+  v == null ? null : max === 5 ? v : Number(((v / max) * 5).toFixed(2))
+
 const itemConfig = {
   latest: { label: '最新', color: 'var(--chart-1)' },
   previous: { label: '前回', color: 'var(--chart-3)' },
 } satisfies ChartConfig
 
-/** 9項目を1〜5点で比較する詳細レーダー */
+/** 全項目の詳細レーダー。3段階の項目は5点満点に換算して並べる（ツールチップには元の段階を表示） */
 export function ItemRadar({
   detail,
   criteria,
@@ -139,8 +143,11 @@ export function ItemRadar({
   const data = criteria.categories.flatMap((c) =>
     c.items.map((i) => ({
       item: i.name,
-      latest: latest?.itemScores[i.itemKey] ?? null,
-      previous: previous?.itemScores[i.itemKey] ?? null,
+      max: itemMax(i),
+      latest: toFiveScale(latest?.itemScores[i.itemKey], itemMax(i)),
+      previous: toFiveScale(previous?.itemScores[i.itemKey], itemMax(i)),
+      latestRaw: latest?.itemScores[i.itemKey] ?? null,
+      previousRaw: previous?.itemScores[i.itemKey] ?? null,
     })),
   )
   return (
@@ -149,9 +156,18 @@ export function ItemRadar({
         <ChartTooltip
           content={
             <ChartTooltipContent
-              formatter={(v, name) =>
-                `${itemConfig[name as 'latest'].label}: ${formatScore(Number(v), 2)}点`
-              }
+              formatter={(v, name, entry) => {
+                const row = entry.payload as {
+                  max: number
+                  latestRaw: number | null
+                  previousRaw: number | null
+                }
+                const raw = name === 'latest' ? row.latestRaw : row.previousRaw
+                const label = itemConfig[name as 'latest'].label
+                return row.max === 5
+                  ? `${label}: ${formatScore(Number(v), 2)}点`
+                  : `${label}: ${formatScore(raw, 2)} / ${row.max}（5点換算 ${formatScore(Number(v), 2)}）`
+              }}
             />
           }
         />

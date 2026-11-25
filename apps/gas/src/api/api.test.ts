@@ -1,3 +1,4 @@
+import { buildStandardCriteria } from '@kyonan/shared'
 import { describe, expect, it } from 'vitest'
 import { EMAILS, GROUP, createTestApi, scoresOf } from '../test-utils'
 
@@ -254,10 +255,160 @@ describe('チーム編成・評価基準', () => {
           categoryKey: 'TEC',
           name: '技術',
           weight: 90,
-          items: [{ itemKey: 'T1', name: 'a', description: '', rubric: {} }],
+          items: [
+            {
+              itemKey: 'T1',
+              name: 'a',
+              description: '',
+              rubric: {},
+              maxScore: 5 as const,
+              allowUnobserved: false,
+            },
+          ],
         },
       ],
     })
     expect(errorCode(res)).toBe('VALIDATION_ERROR')
+  })
+})
+
+describe('練習への取り組み（3段階・未観察）', () => {
+  const standard = buildStandardCriteria('std')
+  const ENG = ['ENG-01', 'ENG-02', 'ENG-03', 'ENG-04']
+  const engScores = (values: (number | null)[]) =>
+    Object.fromEntries(ENG.map((k, i) => [k, values[i] ?? null]))
+  const payload = (
+    cycleId: string,
+    scores: Record<string, number | null>,
+    rev: number | null = null,
+  ) => ({
+    cycleId,
+    playerId: 'p1',
+    scores,
+    strengths: '',
+    improvementPoints: '',
+    comment: '',
+    expectedRevision: rev,
+  })
+
+  /** 標準の評価基準（取り組みを含む）を API から作成し、評価期間を開始する */
+  function setup() {
+    const t = createTestApi()
+    const created = t.ok(EMAILS.admin, 'criteria.createVersion', {
+      version: 'v-std',
+      name: '標準',
+      thresholdA: 80,
+      thresholdB: 60,
+      categories: standard.categories.map((c) => ({
+        categoryKey: c.categoryKey,
+        name: c.name,
+        weight: c.weight,
+        items: c.items.map((i) => ({
+          itemKey: i.itemKey,
+          name: i.name,
+          description: i.description,
+          rubric: i.rubric,
+          maxScore: i.maxScore as 3 | 5,
+          allowUnobserved: i.allowUnobserved,
+        })),
+      })),
+    })
+    const cycle = t.ok(EMAILS.admin, 'cycles.create', {
+      groupId: GROUP,
+      name: '標準基準の評価',
+      startDate: '2026-06-01',
+      endDate: '2026-06-14',
+      criteriaVersionId: created.version.id,
+      minEvaluatorCount: 1,
+    })
+    t.ok(EMAILS.admin, 'cycles.open', { id: cycle.id })
+    return { t, cycleId: cycle.id, created }
+  }
+
+  it('評価基準を作成すると、項目ごとの段階数・未観察の可否が保存される', () => {
+    const { created } = setup()
+    const eng = created.categories.find((c) => c.categoryKey === 'ENG')!
+    expect(created.categories.map((c) => c.weight)).toEqual([25, 20, 25, 20, 10])
+    expect(eng.items.map((i) => [i.maxScore, i.allowUnobserved])).toEqual([
+      [3, true],
+      [3, true],
+      [3, true],
+      [3, true],
+    ])
+    expect(created.categories[0]!.items[0]).toMatchObject({ maxScore: 5, allowUnobserved: false })
+  })
+
+  it('取り組みを未観察のまま、必須の9項目だけで提出できる', () => {
+    const { t, cycleId } = setup()
+    const res = t.ok(
+      EMAILS.coach,
+      'assessments.submit',
+      payload(cycleId, { ...scoresOf(4), ...engScores([]) }),
+    )
+    expect(res.status).toBe('submitted')
+  })
+
+  it('取り組みは3段階まで。4点以上は下書きでも拒否し、必須項目が欠けた提出も拒否する', () => {
+    const { t, cycleId } = setup()
+    const over = t.call(
+      EMAILS.coach,
+      'assessments.save',
+      payload(cycleId, { ...scoresOf(4), ...engScores([4]) }),
+    )
+    expect(errorCode(over)).toBe('VALIDATION_ERROR')
+    const short = t.call(
+      EMAILS.coach,
+      'assessments.submit',
+      payload(cycleId, { ...scoresOf(4), 'TEC-01': null }),
+    )
+    expect(errorCode(short)).toBe('VALIDATION_ERROR')
+    expect(!short.success && short.error.message).toContain('必須の9項目')
+  })
+
+  it('確定すると、観察できた項目・カテゴリだけで100点に換算した結果になる', () => {
+    const { t, cycleId } = setup()
+    // 評価者1：取り組みを観察（3,3,1,未観察）／評価者2：取り組みはすべて未観察
+    t.ok(
+      EMAILS.coach,
+      'assessments.submit',
+      payload(cycleId, { ...scoresOf(4), ...engScores([3, 3, 1, null]) }),
+    )
+    t.ok(
+      EMAILS.coach2,
+      'assessments.submit',
+      payload(cycleId, { ...scoresOf(4), ...engScores([]) }),
+    )
+    t.ok(EMAILS.admin, 'cycles.finalize', { id: cycleId, acknowledgeInsufficient: true })
+
+    const row = t
+      .ok(EMAILS.coach, 'results.list', { cycleId })
+      .rows.find((r) => r.player.id === 'p1')!
+    expect(row.result.evaluatorCount).toBe(2)
+    // ENG-01 は観察した評価者のみの平均（3）、ENG-04 は誰も観察していないため集計されない
+    expect(row.result.itemScores['ENG-01']).toBe(3)
+    expect(row.result.itemScores['ENG-03']).toBe(1)
+    expect(row.result.itemScores['ENG-04']).toBeUndefined()
+    // 取り組み：(1 + 1 + 1/3) / 3 × 10 = 7.78点。基本4カテゴリは4/5 = 80%
+    expect(row.result.categoryScores.ENG).toBeCloseTo(((1 + 1 + 1 / 3) / 3) * 10)
+    expect(row.result.categoryScores.TEC).toBeCloseTo(20)
+    // 基本4カテゴリ（配点90点）の4/5 = 72点 ＋ 取り組み 7.78点 ＝ 79.78 → 79.8点
+    expect(row.result.totalScore).toBe(79.8)
+  })
+
+  it('全員が取り組みを観察できなかった場合、取り組みを除いた配点（90点）で100点に換算する', () => {
+    const { t, cycleId } = setup()
+    t.ok(EMAILS.coach, 'assessments.submit', payload(cycleId, { ...scoresOf(4), ...engScores([]) }))
+    t.ok(EMAILS.admin, 'cycles.finalize', { id: cycleId, acknowledgeInsufficient: true })
+    const row = t
+      .ok(EMAILS.coach, 'results.list', { cycleId })
+      .rows.find((r) => r.player.id === 'p1')!
+    expect(row.result.categoryScores.ENG).toBeUndefined()
+    expect(row.result.totalScore).toBe(80)
+  })
+
+  it('旧データ（段階数・未観察の列が空）は、5段階・未観察なしとして扱う', () => {
+    const t = createTestApi()
+    const [category] = t.ok(EMAILS.admin, 'criteria.list')[0]!.categories
+    expect(category!.items.every((i) => i.maxScore === 5 && !i.allowUnobserved)).toBe(true)
   })
 })

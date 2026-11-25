@@ -61,6 +61,8 @@ export function createCriteriaVersion(
         description: item.description,
         rubric: item.rubric,
         sortOrder: ii + 1,
+        maxScore: item.maxScore,
+        allowUnobserved: item.allowUnobserved,
       })),
     )
   })

@@ -17,9 +17,9 @@ import type {
 import type { Cell, Row } from '../infrastructure/table-store'
 
 /** テーブル定義のバージョン。列の追加・変更時に更新し、setupSheets でマイグレーションする。 */
-export const SCHEMA_VERSION = '1'
+export const SCHEMA_VERSION = '2'
 
-type ColumnType = 'string' | 'nstring' | 'number' | 'nnumber' | 'json'
+type ColumnType = 'string' | 'nstring' | 'number' | 'nnumber' | 'json' | 'boolean'
 
 export interface ColumnDef {
   column: string
@@ -121,6 +121,8 @@ export const TABLES = {
     col('description'),
     col('rubricJson', 'json', 'rubric'),
     col('sortOrder', 'number'),
+    col('maxScore', 'number'),
+    col('allowUnobserved', 'boolean'),
   ]),
   assessments: table<Assessment>('assessments', [
     col('id'),
@@ -196,6 +198,8 @@ function encodeCell(type: ColumnType, value: unknown): Cell {
   switch (type) {
     case 'json':
       return JSON.stringify(value)
+    case 'boolean':
+      return value ? 1 : 0
     case 'number':
     case 'nnumber':
       return typeof value === 'number' ? value : Number(value)
@@ -219,6 +223,8 @@ function decodeCell(type: ColumnType, raw: Cell | undefined): unknown {
       return empty ? '' : String(raw)
     case 'nstring':
       return empty ? null : String(raw)
+    case 'boolean':
+      return raw === 1 || raw === '1' || raw === true || raw === 'true' || raw === 'TRUE'
     case 'number':
       return empty ? 0 : Number(raw)
     case 'nnumber':

@@ -1,6 +1,7 @@
 import {
   computeScores,
   findMissingItems,
+  listRequiredItems,
   judgeTeam,
   listItemKeys,
   type Assessment,
@@ -144,8 +145,10 @@ function AssessmentForm({ overview, playerId }: { overview: CycleOverview; playe
   const submit = useApiMutation('assessments.submit', { silentError: true })
   const pending = save.isPending || submit.isPending
 
-  const filled = Object.values(scores ?? {}).filter((v) => v !== null).length
-  const total = listItemKeys(criteria).length
+  // 提出に必要なのは必須項目のみ。未観察を許可した項目（練習への取り組み）は未入力でもよい
+  const required = listRequiredItems(criteria)
+  const total = required.length
+  const filled = total - findMissingItems(criteria, scores ?? {}).length
   const complete = filled === total
 
   const run = (mode: SaveMode, goNext: boolean) => {
@@ -284,7 +287,9 @@ function AssessmentForm({ overview, playerId }: { overview: CycleOverview; playe
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{item.name}</span>
                         {scores?.[item.itemKey] == null && (
-                          <span className="text-[11px] text-muted-foreground">未評価</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {item.allowUnobserved ? '未観察' : '未評価'}
+                          </span>
                         )}
                       </div>
                       <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
@@ -376,7 +381,7 @@ function AssessmentForm({ overview, playerId }: { overview: CycleOverview; playe
           </div>
           {!complete && (
             <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              提出には全{total}項目の評価が必要です（残り{total - filled}項目）
+              提出には必須の{total}項目の評価が必要です（残り{total - filled}項目）
             </p>
           )}
         </div>

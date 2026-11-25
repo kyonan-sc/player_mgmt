@@ -38,6 +38,8 @@ function toInput(c: CriteriaDefinition, nextVersion: string): CriteriaVersionInp
         itemKey: i.itemKey,
         name: i.name,
         description: i.description,
+        maxScore: i.maxScore === 3 ? 3 : 5,
+        allowUnobserved: i.allowUnobserved === true,
         rubric: i.rubric,
       })),
     })),
@@ -93,8 +95,17 @@ function CriteriaView({ c, latest }: { c: CriteriaDefinition; latest: boolean })
                       <span className="text-[11px] text-muted-foreground">{item.itemKey}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">{item.description}</p>
+                    {(item.maxScore === 3 || item.allowUnobserved) && (
+                      <div className="mt-1 flex gap-1">
+                        {item.maxScore === 3 && <Pill tone="neutral">3段階</Pill>}
+                        {item.allowUnobserved && <Pill tone="neutral">未観察あり</Pill>}
+                      </div>
+                    )}
                     <dl className="mt-1.5 grid gap-0.5 text-xs">
-                      {(['5', '3', '1'] as const).map((lv) => (
+                      {(item.maxScore === 3
+                        ? (['3', '2', '1'] as const)
+                        : (['5', '3', '1'] as const)
+                      ).map((lv) => (
                         <div key={lv} className="flex gap-2">
                           <dt className="num w-6 font-semibold">{lv}点</dt>
                           <dd className="text-muted-foreground">{item.rubric[lv] ?? '—'}</dd>
@@ -109,6 +120,58 @@ function CriteriaView({ c, latest }: { c: CriteriaDefinition; latest: boolean })
         </div>
       )}
     </section>
+  )
+}
+
+/** 段階数（5段階／3段階）、未観察の許可、各段階の目安。段階数に応じて目安の入力欄が変わる */
+function ItemScale({
+  control,
+  register,
+  ci,
+  ii,
+}: {
+  control: Control<CriteriaVersionInput>
+  register: UseFormRegister<CriteriaVersionInput>
+  ci: number
+  ii: number
+}) {
+  const maxScore = useWatch({ control, name: `categories.${ci}.items.${ii}.maxScore` })
+  const levels = maxScore === 3 ? (['1', '2', '3'] as const) : (['1', '3', '5'] as const)
+  return (
+    <>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 text-sm">
+          段階
+          <select
+            aria-label="段階数"
+            className="h-9 rounded-lg border border-input bg-card px-2 text-sm"
+            {...register(`categories.${ci}.items.${ii}.maxScore`, { valueAsNumber: true })}
+          >
+            <option value={5}>5段階</option>
+            <option value={3}>3段階</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 accent-primary"
+            {...register(`categories.${ci}.items.${ii}.allowUnobserved`)}
+          />
+          未観察を許可（未入力でも提出でき、平均に含めない）
+        </label>
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {levels.map((lv) => (
+          <Textarea
+            key={lv}
+            rows={2}
+            aria-label={`${lv}点の目安`}
+            placeholder={`${lv}点の目安`}
+            {...register(`categories.${ci}.items.${ii}.rubric.${lv}`)}
+          />
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -154,24 +217,23 @@ function ItemsEditor({
             placeholder="評価内容"
             {...register(`categories.${ci}.items.${ii}.description`)}
           />
-          <div className="mt-2 grid gap-2 sm:grid-cols-3">
-            {(['1', '3', '5'] as const).map((lv) => (
-              <Textarea
-                key={lv}
-                rows={2}
-                aria-label={`${lv}点の目安`}
-                placeholder={`${lv}点の目安`}
-                {...register(`categories.${ci}.items.${ii}.rubric.${lv}`)}
-              />
-            ))}
-          </div>
+          <ItemScale control={control} register={register} ci={ci} ii={ii} />
         </div>
       ))}
       <Button
         type="button"
         variant="outline"
         size="sm"
-        onClick={() => append({ itemKey: '', name: '', description: '', rubric: {} })}
+        onClick={() =>
+          append({
+            itemKey: '',
+            name: '',
+            description: '',
+            maxScore: 5,
+            allowUnobserved: false,
+            rubric: {},
+          })
+        }
       >
         <Plus /> 項目を追加
       </Button>
@@ -295,7 +357,16 @@ function CriteriaEditor({ base, onClose }: { base: CriteriaVersionInput; onClose
               categoryKey: '',
               name: '',
               weight: 0,
-              items: [{ itemKey: '', name: '', description: '', rubric: {} }],
+              items: [
+                {
+                  itemKey: '',
+                  name: '',
+                  description: '',
+                  maxScore: 5,
+                  allowUnobserved: false,
+                  rubric: {},
+                },
+              ],
             })
           }
         >

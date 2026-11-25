@@ -1,7 +1,9 @@
 import {
   aggregateAssessments,
+  findInvalidItems,
   findMissingItems,
   listItemKeys,
+  listRequiredItems,
   type ApiPayload,
   type Assessment,
   type AssessmentHistoryEntry,
@@ -114,12 +116,21 @@ export function saveAssessment(
   const unknown = Object.keys(input.scores).filter((k) => !itemKeys.includes(k))
   if (unknown.length > 0) throw invalid(`評価基準にない項目が含まれています: ${unknown.join(', ')}`)
   const scores: ItemScores = Object.fromEntries(itemKeys.map((k) => [k, input.scores[k] ?? null]))
+  // 項目ごとの段階数（例：3段階の項目に4点）を超える値は、下書きでも保存しない
+  const invalidItems = findInvalidItems(criteria, scores)
+  if (invalidItems.length > 0) {
+    throw invalid(
+      `評価の段階が正しくない項目があります: ${invalidItems.join(', ')}`,
+      invalidItems.map((key) => ({ path: `scores.${key}`, message: '段階が範囲外です' })),
+    )
+  }
 
   if (submit) {
     const missing = findMissingItems(criteria, scores)
     if (missing.length > 0) {
+      const required = listRequiredItems(criteria).length
       throw invalid(
-        `提出には全${itemKeys.length}項目の評価が必要です（未入力 ${missing.length}項目）`,
+        `提出には必須の${required}項目の評価が必要です（未入力 ${missing.length}項目）`,
         missing.map((key) => ({ path: `scores.${key}`, message: '未入力' })),
       )
     }
