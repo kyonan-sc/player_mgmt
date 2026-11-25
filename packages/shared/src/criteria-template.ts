@@ -62,7 +62,7 @@ export function buildInitialCriteria(
   })
 }
 
-/** 標準の評価基準：基本の4カテゴリ（配点調整）＋「練習への取り組み」（3段階・未観察あり）。新規環境の初期データ */
+/** 標準の評価基準：基本の4カテゴリ（配点調整）＋「練習への取り組み」（3段階）。新規環境の初期データ */
 export function buildStandardCriteria(
   versionId = 'criteria-standard',
   createdAt = '2026-01-01T00:00:00.000Z',

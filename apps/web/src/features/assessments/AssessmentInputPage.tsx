@@ -1,6 +1,7 @@
 import {
   computeScores,
   findMissingItems,
+  listItems,
   listRequiredItems,
   judgeTeam,
   listItemKeys,
@@ -145,7 +146,7 @@ function AssessmentForm({ overview, playerId }: { overview: CycleOverview; playe
   const submit = useApiMutation('assessments.submit', { silentError: true })
   const pending = save.isPending || submit.isPending
 
-  // 提出に必要なのは必須項目のみ。未観察を許可した項目（練習への取り組み）は未入力でもよい
+  // 提出に必要なのは必須項目（未観察を許可した項目を除く全項目）
   const required = listRequiredItems(criteria)
   const total = required.length
   const filled = total - findMissingItems(criteria, scores ?? {}).length
@@ -381,7 +382,8 @@ function AssessmentForm({ overview, playerId }: { overview: CycleOverview; playe
           </div>
           {!complete && (
             <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              提出には必須の{total}項目の評価が必要です（残り{total - filled}項目）
+              提出には{total === listItems(criteria).length ? '全' : '必須の'}
+              {total}項目の評価が必要です（残り{total - filled}項目）
             </p>
           )}
         </div>

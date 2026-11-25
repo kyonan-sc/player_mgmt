@@ -35,7 +35,7 @@ test('コーチが選手を評価して提出できる', async ({ page }) => {
 
   // 5段階の項目は4点、3段階の「練習への取り組み」は「自分で（3点）」を選ぶ
   for (const group of await page.getByRole('radiogroup').all()) {
-    const threeLevel = (await group.getByRole('radio', { name: /^未観察/ }).count()) > 0
+    const threeLevel = (await group.getByRole('radio').count()) === 3
     await group.getByRole('radio', { name: threeLevel ? /^3点/ : /^4点/ }).click()
   }
   // 4カテゴリ80%（配点90）＋練習への取り組み100%（配点10）

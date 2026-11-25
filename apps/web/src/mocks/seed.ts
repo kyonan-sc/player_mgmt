@@ -158,7 +158,7 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
   criteriaV2.version = { ...criteriaV2.version, version: 'v2', name: '2026年度 改訂基準' }
   criteriaV2.categories[1]!.items[0]!.description =
     '味方・相手・スペースを、ボールを受ける前から認識しているか'
-  // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階＋未観察）を追加
+  // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階）を追加
   const criteriaV3: CriteriaDefinition = buildStandardCriteria(
     'criteria-v3',
     iso('2026-09-01', 0),
@@ -190,9 +190,8 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
     base: Object.fromEntries(
       itemKeys.map((k) => [k, 1.6 + rand() * 2.0 + (i % 5 === 0 ? 0.6 : 0)]),
     ),
-    // 練習への取り組み（3段階の基準値）と、練習を欠席・見学する割合
+    // 練習への取り組み（3段階）の基準値
     engagement: 1.6 + rand() * 1.4,
-    absence: 0.04 + rand() * 0.2,
     trend: TRENDS[i % TRENDS.length]!,
     // 一部の選手は担当コーチによって見え方が大きく異なる（評価ばらつき）
     divergent: i === 4 || i === 17,
@@ -245,19 +244,14 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
     for (const profile of targets) {
       cyclePlayers.push({ id: nextId('cp'), cycleId: cycle.id, playerId: profile.player.id })
       const submittedScores: ItemScores[] = []
-      /**
-       * 項目の得点を作る。3段階の項目（練習への取り組み）は、欠席・見学の日は全項目が未観察（null）、
-       * 出席していても一部の項目は観察できない（null）ことがある。
-       */
-      const scoreOf = (item: CriteriaItem, attended: boolean): number | null => {
+      // 項目の得点を作る（練習への取り組みは3段階）
+      const scoreOf = (item: CriteriaItem): number => {
         if (item.maxScore !== 3)
           return clampScore(trueLevel(profile, item.itemKey, t) + (rand() - 0.5) * 0.9)
-        if (!attended || rand() < 0.1) return null
         const v = profile.engagement + 0.08 * t + (rand() - 0.5) * 1.1
         return Math.max(1, Math.min(3, Math.round(v)))
       }
       evaluators.forEach((coach, ci) => {
-        const attended = rand() > profile.absence
         if (isOpen) {
           // 実施中：田中コーチは一部提出済み・一部下書き、佐藤コーチは一部提出済み、監督は未着手
           const n = Number(profile.player.jerseyNumber)
@@ -277,7 +271,7 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
           const scores = Object.fromEntries(
             criteriaItems.map((item, ki) => [
               item.itemKey,
-              status === 'draft' && ki > 5 ? null : scoreOf(item, attended),
+              status === 'draft' && ki > 5 ? null : scoreOf(item),
             ]),
           )
           assessments.push(
@@ -291,8 +285,8 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
         const scores = Object.fromEntries(
           criteriaItems.map((item) => {
             const k = item.itemKey
-            const v = scoreOf(item, attended)
-            if (v !== null && profile.divergent && ci === 1 && (k === 'DEC-01' || k === 'DUE-02')) {
+            const v = scoreOf(item)
+            if (profile.divergent && ci === 1 && (k === 'DEC-01' || k === 'DUE-02')) {
               return [k, clampScore(v + 2)]
             }
             return [k, v]

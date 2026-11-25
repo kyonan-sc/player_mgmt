@@ -13,8 +13,8 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
-/** 未観察の判断の目安（欠席・見学など） */
-const UNOBSERVED_HINT = '欠席、見学、観察できる場面がなかった場合'
+/** 未観察の判断の目安 */
+const UNOBSERVED_HINT = 'この期間中、観察できる機会がほとんどなかった場合'
 
 const levelsOf = (item: CriteriaItem): number[] =>
   Array.from({ length: itemMax(item) }, (_, i) => i + 1)

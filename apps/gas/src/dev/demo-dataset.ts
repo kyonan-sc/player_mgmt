@@ -288,7 +288,7 @@ export function buildStagingDemoDataset(
   )
   criteriaV2.version = { ...criteriaV2.version, version: 'v2', name: '2026年度 改訂基準' }
   reviseWording(criteriaV2)
-  // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階＋未観察）を追加
+  // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階）を追加
   const criteriaV3: CriteriaDefinition = buildStandardCriteria(
     'criteria-v3',
     iso(addDays(CYCLES[CRITERIA_V3_FROM]!.start, -14)),
@@ -329,9 +329,8 @@ export function buildStagingDemoDataset(
         2.0 + rand() * 2.1 + (i % 7 === 0 ? 0.3 : 0) - (JOINERS[i] !== undefined ? 0.3 : 0)
       return Object.fromEntries(itemKeys.map((k) => [k, talent + (rand() - 0.5) * 0.8]))
     })(),
-    // 練習への取り組み（3段階の基準値）と、練習を欠席・見学する割合
+    // 練習への取り組み（3段階）の基準値
     engagement: 1.6 + rand() * 1.4,
-    absence: 0.04 + rand() * 0.2,
     trend: TRENDS[i % TRENDS.length]!,
     divergent: i === 4 || i === 17 || i === 26,
   }))
@@ -425,13 +424,9 @@ export function buildStagingDemoDataset(
         growth(profile.trend, t - profile.joinedAt) +
         bias +
         (rand() - 0.5) * 0.9
-      /**
-       * 項目の得点を作る。3段階の項目（練習への取り組み）は、欠席・見学の日は全項目が未観察（null）、
-       * 出席していても一部の項目は観察できない（null）ことがある。
-       */
-      const scoreOf = (item: CriteriaItem, bias: number, attended: boolean): number | null => {
+      // 項目の得点を作る（練習への取り組みは3段階）
+      const scoreOf = (item: CriteriaItem, bias: number): number => {
         if (item.maxScore !== 3) return clampScore(level(item.itemKey, bias))
-        if (!attended || rand() < 0.1) return null
         const v =
           profile.engagement + 0.08 * (t - profile.joinedAt) + bias * 0.5 + (rand() - 0.5) * 1.1
         return Math.max(1, Math.min(3, Math.round(v)))
@@ -447,11 +442,10 @@ export function buildStagingDemoDataset(
           const r = rand()
           if (r > 0.42) continue
           const draft = r > 0.34
-          const attended = rand() > profile.absence
           const scores = Object.fromEntries(
             criteriaItems.map((item, ki) => [
               item.itemKey,
-              draft && ki > 4 ? null : scoreOf(item, e.def.bias, attended),
+              draft && ki > 4 ? null : scoreOf(item, e.def.bias),
             ]),
           )
           assessments.push(
@@ -471,12 +465,11 @@ export function buildStagingDemoDataset(
       const count = r < 0.08 ? 1 : r < 0.6 ? 2 : r < 0.93 ? 3 : 4
       const submitted: ItemScores[] = []
       pool.slice(0, count).forEach((e, ei) => {
-        const attended = rand() > profile.absence
         const scores = Object.fromEntries(
           criteriaItems.map((item) => {
             const k = item.itemKey
-            const v = scoreOf(item, e.def.bias, attended)
-            if (v !== null && profile.divergent && ei === 0 && (k === 'DEC-01' || k === 'DUE-02')) {
+            const v = scoreOf(item, e.def.bias)
+            if (profile.divergent && ei === 0 && (k === 'DEC-01' || k === 'DUE-02')) {
               return [k, clampScore(v + 2)]
             }
             return [k, v]
