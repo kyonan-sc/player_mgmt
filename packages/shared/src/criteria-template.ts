@@ -1,5 +1,4 @@
 import {
-  CRITERIA_BEFORE_SHOOTING,
   DEFAULT_THRESHOLD_A,
   DEFAULT_THRESHOLD_B,
   INITIAL_CRITERIA,
@@ -74,22 +73,6 @@ export function buildStandardCriteria(
     versionId,
     version: options.version ?? 'v1',
     name: options.name ?? '標準評価基準',
-    createdAt,
-    createdBy,
-  })
-}
-
-/** シュート追加前の標準基準（配点25/20/25/20/10）。過去の評価期間を再現するデモデータ・テスト用 */
-export function buildCriteriaBeforeShooting(
-  versionId = 'criteria-before-shooting',
-  createdAt = '2026-01-01T00:00:00.000Z',
-  createdBy = 'system',
-  options: { version?: string; name?: string } = {},
-): CriteriaDefinition {
-  return buildFromTemplate(CRITERIA_BEFORE_SHOOTING, {
-    versionId,
-    version: options.version ?? 'v1',
-    name: options.name ?? '標準評価基準（シュート追加前）',
     createdAt,
     createdBy,
   })

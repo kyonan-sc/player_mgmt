@@ -78,7 +78,7 @@ describe('検証用ダミーデータ（約1年分）', () => {
     expect(overview.players.length).toBe(33)
   })
 
-  it('評価基準は v1〜v4 の履歴を持ち、実施中の最新期間だけが「シュート」を含む標準基準（v4）を使う', () => {
+  it('全評価期間が、「シュート」を含む標準基準（v4）で評価されている', () => {
     const { tables } = setup()
     const itemKeysOf = (versionId: string) => {
       const categoryIds = new Set(
@@ -88,13 +88,22 @@ describe('検証用ダミーデータ（約1年分）', () => {
         .criteria_items!.filter((i) => categoryIds.has(i.categoryId as string))
         .map((i) => i.itemKey)
     }
-    expect(tables.criteria_versions!.map((v) => v.version)).toEqual(['v1', 'v2', 'v3', 'v4'])
-    expect(itemKeysOf('criteria-v3')).not.toContain('TEC-04')
+    expect(tables.criteria_versions!.map((v) => v.version)).toEqual(['v4'])
     expect(itemKeysOf('criteria-v4')).toContain('TEC-04')
     expect(itemKeysOf('criteria-v4')).toHaveLength(14)
+    expect(tables.assessment_cycles!.every((c) => c.criteriaVersionId === 'criteria-v4')).toBe(true)
+    expect(tables.assessment_results!.every((r) => r.criteriaVersionId === 'criteria-v4')).toBe(
+      true,
+    )
 
-    const cycle10 = tables.assessment_cycles!.find((c) => c.id === 'cycle-10')!
-    expect(cycle10.criteriaVersionId).toBe('criteria-v4')
+    // 確定済みの過去の期間でも、全14項目が揃っている（シュート・取り組みを含む）
+    const past = tables.assessments!.filter(
+      (a) => a.cycleId === 'cycle-01' && a.status === 'submitted',
+    )
+    expect(past.length).toBeGreaterThan(0)
+    expect(past.every((a) => Object.keys(JSON.parse(a.scoresJson as string)).length === 14)).toBe(
+      true,
+    )
     const mine = tables.assessments!.filter(
       (a) => a.cycleId === 'cycle-10' && a.status === 'submitted',
     )

@@ -1,8 +1,6 @@
 import {
   aggregateAssessments,
   listItems,
-  buildCriteriaBeforeShooting,
-  buildInitialCriteria,
   buildStandardCriteria,
   type Assessment,
   type AssessmentCycle,
@@ -68,12 +66,6 @@ const CYCLES = [
   { name: '2026年10月評価', start: '2026-10-26', end: '2026-11-08' },
   { name: '2026年11月評価', start: '2026-11-16', end: '2026-11-29' },
 ]
-/** この評価期間インデックス以降は改訂基準（v2） */
-const CRITERIA_V2_FROM = 5
-/** この評価期間インデックス以降は「練習への取り組み」を加えた基準（v3） */
-const CRITERIA_V3_FROM = 7
-/** この評価期間インデックス以降は「シュート」を加え配点を調整した標準基準（v4）。実施中の最新期間から適用 */
-const CRITERIA_V4_FROM = 9
 
 const FAMILY = [
   '佐藤',
@@ -277,44 +269,16 @@ export function buildStagingDemoDataset(
     .filter((c) => c.role !== 'admin')
     .map((c, i) => ({ id: `cg-${pad(i + 1)}`, coachId: c.id, groupId: GROUP_ID }))
 
-  const reviseWording = (c: CriteriaDefinition) => {
-    c.categories[1]!.items[0]!.description =
-      '味方・相手・スペースを、ボールを受ける前から認識しているか'
-    c.categories[3]!.items[1]!.description =
-      'ボールを失った直後に、近くの味方と連携して守備へ切り替えられるか'
-  }
-  const criteriaV1 = buildInitialCriteria('criteria-v1', created, 'coach-01')
-  const criteriaV2: CriteriaDefinition = buildInitialCriteria(
-    'criteria-v2',
-    iso(addDays(CYCLES[CRITERIA_V2_FROM]!.start, -14)),
-    'coach-01',
-  )
-  criteriaV2.version = { ...criteriaV2.version, version: 'v2', name: '2026年度 改訂基準' }
-  reviseWording(criteriaV2)
-  // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階）を追加
-  const criteriaV3: CriteriaDefinition = buildCriteriaBeforeShooting(
-    'criteria-v3',
-    iso(addDays(CYCLES[CRITERIA_V3_FROM]!.start, -14)),
-    'coach-01',
-    { version: 'v3', name: '2026年度 標準基準（練習への取り組みを追加）' },
-  )
-  reviseWording(criteriaV3)
-  // v4：技術力に「シュート」を追加（技術30・判断20・対人20・試合関与20・取り組み10）
-  const criteriaV4: CriteriaDefinition = buildStandardCriteria(
-    'criteria-v4',
-    iso(addDays(CYCLES[CRITERIA_V4_FROM]!.start, -14)),
-    'coach-01',
-    { version: 'v4', name: '2026年度 標準基準（シュートを追加・配点見直し）' },
-  )
-  reviseWording(criteriaV4)
-  const criteriaFor = (t: number) =>
-    t >= CRITERIA_V4_FROM
-      ? criteriaV4
-      : t >= CRITERIA_V3_FROM
-        ? criteriaV3
-        : t >= CRITERIA_V2_FROM
-          ? criteriaV2
-          : criteriaV1
+  // 全評価期間を、技術力に「シュート」を含む標準基準（v4）で評価したデータにする
+  const criteriaV4: CriteriaDefinition = buildStandardCriteria('criteria-v4', created, 'coach-01', {
+    version: 'v4',
+    name: '2026年度 標準基準（シュートを追加・配点見直し）',
+  })
+  criteriaV4.categories[1]!.items[0]!.description =
+    '味方・相手・スペースを、ボールを受ける前から認識しているか'
+  criteriaV4.categories[3]!.items[1]!.description =
+    'ボールを失った直後に、近くの味方と連携して守備へ切り替えられるか'
+  const criteriaFor = (_t: number) => criteriaV4
   /** 5段階の項目（基本の10項目）。選手ごとの力量はこのキーで持つ */
   const itemKeys = criteriaV4.categories
     .flatMap((c) => c.items)
@@ -543,7 +507,7 @@ export function buildStagingDemoDataset(
     }
   })
 
-  const criteriaList = [criteriaV1, criteriaV2, criteriaV3, criteriaV4]
+  const criteriaList = [criteriaV4]
   const tables: Record<string, Row[]> = {
     [TABLES.groups.name]: groups.map((g) => encodeRow(TABLES.groups, g)),
     [TABLES.coaches.name]: coaches.map((c) => encodeRow(TABLES.coaches, c)),

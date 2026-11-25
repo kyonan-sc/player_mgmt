@@ -1,7 +1,5 @@
 import {
   aggregateAssessments,
-  buildCriteriaBeforeShooting,
-  buildInitialCriteria,
   buildStandardCriteria,
   listItems,
   type CriteriaItem,
@@ -149,38 +147,16 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
     .map((c, i) => ({ id: `cg-${i + 1}`, coachId: c.id, groupId }))
   const evaluators = coaches.slice(0, 3)
 
-  const criteriaV1 = buildInitialCriteria('criteria-v1', iso('2026-03-01', 0), 'coach-1')
-  // v2：評価内容の文言を改訂（構造・配点は同一のため互換）
-  const criteriaV2: CriteriaDefinition = buildInitialCriteria(
-    'criteria-v2',
-    iso('2026-08-01', 0),
-    'coach-1',
-  )
-  criteriaV2.version = { ...criteriaV2.version, version: 'v2', name: '2026年度 改訂基準' }
-  criteriaV2.categories[1]!.items[0]!.description =
-    '味方・相手・スペースを、ボールを受ける前から認識しているか'
-  // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階）を追加
-  const criteriaV3: CriteriaDefinition = buildCriteriaBeforeShooting(
-    'criteria-v3',
-    iso('2026-09-01', 0),
-    'coach-1',
-    { version: 'v3', name: '2026年度 標準基準（練習への取り組みを追加）' },
-  )
-  criteriaV3.categories[1]!.items[0]!.description =
-    '味方・相手・スペースを、ボールを受ける前から認識しているか'
-  // v4：技術力に「シュート」を追加（技術30・判断20・対人20・試合関与20・取り組み10）。実施中の最新期間から適用
+  // 全評価期間を、技術力に「シュート」を含む標準基準（v4）で評価したデータにする
   const criteriaV4: CriteriaDefinition = buildStandardCriteria(
     'criteria-v4',
-    iso('2026-10-01', 0),
+    iso('2026-03-01', 0),
     'coach-1',
     { version: 'v4', name: '2026年度 標準基準（シュートを追加・配点見直し）' },
   )
   criteriaV4.categories[1]!.items[0]!.description =
     '味方・相手・スペースを、ボールを受ける前から認識しているか'
-  const V3_FROM = 4
-  const V4_FROM = CYCLE_DEFS.length - 1
-  const criteriaFor = (t: number) =>
-    t >= V4_FROM ? criteriaV4 : t >= V3_FROM ? criteriaV3 : t >= 3 ? criteriaV2 : criteriaV1
+  const criteriaFor = (_t: number) => criteriaV4
 
   const itemKeys = criteriaV4.categories
     .flatMap((c) => c.items)
@@ -403,7 +379,7 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
     }
   }
 
-  const criteriaRows = [criteriaV1, criteriaV2, criteriaV3, criteriaV4]
+  const criteriaRows = [criteriaV4]
   return {
     [TABLES.groups.name]: groups.map((g) => encodeRow(TABLES.groups, g)),
     [TABLES.coaches.name]: coaches.map((c) => encodeRow(TABLES.coaches, c)),

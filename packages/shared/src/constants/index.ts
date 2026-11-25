@@ -232,20 +232,8 @@ export const SHOOTING_ITEM: CriteriaTemplateItem = {
   },
 }
 
-/** 「練習への取り組み」を加えた時点（シュート追加前）の配点。履歴・デモデータで使用する */
-const WEIGHTS_BEFORE_SHOOTING: Record<string, number> = { TEC: 25, DEC: 20, DUE: 25, INV: 20 }
-
 /** 標準の配点。技術力にシュートを加えて30点、対人能力を20点にして合計100点とする */
 const STANDARD_WEIGHTS: Record<string, number> = { TEC: 30, DEC: 20, DUE: 20, INV: 20 }
-
-/** シュート追加前の評価基準（基本の4カテゴリ・9項目＋練習への取り組み）。過去の評価期間の再現用 */
-export const CRITERIA_BEFORE_SHOOTING: CriteriaTemplateCategory[] = [
-  ...INITIAL_CRITERIA.map((c) => ({
-    ...c,
-    weight: WEIGHTS_BEFORE_SHOOTING[c.categoryKey] ?? c.weight,
-  })),
-  ENGAGEMENT_CATEGORY,
-]
 
 /** 標準の評価基準（初期データ・新規環境の既定）：基本の4カテゴリ（技術力にシュートを含む）＋練習への取り組み */
 export const STANDARD_CRITERIA: CriteriaTemplateCategory[] = [

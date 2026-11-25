@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildCriteriaBeforeShooting,
-  buildInitialCriteria,
-  buildStandardCriteria,
-} from '../criteria-template'
+import { buildInitialCriteria, buildStandardCriteria } from '../criteria-template'
 import {
   aggregateAssessments,
   computeScores,
@@ -227,16 +223,8 @@ describe('練習への取り組み（3段階）', () => {
     expect(r.status).toBe('complete')
   })
 
-  it('取り組みやシュートの有無・配点が違う基準は互換でない（差分を出さない）', () => {
+  it('取り組みやシュートの有無・配点が違う旧基準は互換でない（差分を出さない）', () => {
     expect(isCriteriaCompatible(buildInitialCriteria(), standard)).toBe(false)
-    expect(isCriteriaCompatible(buildCriteriaBeforeShooting(), standard)).toBe(false)
-  })
-
-  it('シュート追加前の基準（25/20/25/20/10・13項目）も引き続き計算できる', () => {
-    const before = buildCriteriaBeforeShooting()
-    expect(before.categories.map((c) => c.weight)).toEqual([25, 20, 25, 20, 10])
-    const all = { ...uniform(5), ...Object.fromEntries(eng.map((k) => [k, 3])) }
-    expect(computeScores(before, all).totalScore).toBe(100)
   })
 })
 
