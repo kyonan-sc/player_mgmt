@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useMe } from '@/features/auth/use-me'
 import { useCriteriaList } from '@/features/players/api'
 import { formatDate } from '@/lib/format'
 import { useApiMutation } from '@/lib/query'
@@ -386,14 +387,20 @@ function CriteriaEditor({ base, onClose }: { base: CriteriaVersionInput; onClose
 }
 
 export function CriteriaPage() {
+  const { isAdmin } = useMe()
   const query = useCriteriaList()
   const [editing, setEditing] = useState<CriteriaVersionInput | null>(null)
   return (
     <>
       <PageHeader
         title="評価基準"
-        description="評価カテゴリ・配点・評価項目・A/B判定閾値。変更は新しいバージョンとして保存され、過去の結果は再計算されません。"
+        description={
+          isAdmin
+            ? '評価カテゴリ・配点・評価項目・A/B判定閾値。変更は新しいバージョンとして保存され、過去の結果は再計算されません。'
+            : '評価カテゴリ・配点・評価項目・A/B判定閾値の一覧です（閲覧のみ）。変更は管理者が行います。'
+        }
         actions={
+          isAdmin &&
           !editing &&
           query.data &&
           query.data.length > 0 && (

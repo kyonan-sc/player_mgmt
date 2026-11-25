@@ -137,7 +137,7 @@ function createAppRouter() {
               path: 'settings/criteria',
               ...page(
                 async () => (await import('@/features/settings/CriteriaPage')).CriteriaPage,
-                ADMIN,
+                EVALUATORS,
               ),
             },
             {

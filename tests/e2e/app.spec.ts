@@ -99,6 +99,8 @@ test('閲覧者は管理画面・評価入力にアクセスできない', async
   if (!isMobile) await expect(page.getByRole('link', { name: 'システム設定' })).toHaveCount(0)
   await page.goto('#/settings')
   await expect(page.getByText('この画面を表示する権限がありません')).toBeVisible()
+  await page.goto('#/settings/criteria')
+  await expect(page.getByText('この画面を表示する権限がありません')).toBeVisible()
   await page.goto('#/assessments/cycle-7/players/player-01')
   await expect(page.getByText('この画面を表示する権限がありません')).toBeVisible()
   await page.goto('#/players/player-01')
@@ -122,6 +124,12 @@ test('パスワードでコーチとして入れ、評価を入力できる（�
   await expect(page.getByText('この画面を表示する権限がありません')).toBeVisible()
   await page.goto('#/settings/coaches')
   await expect(page.getByText('この画面を表示する権限がありません')).toBeVisible()
+
+  // 評価基準は読み取り専用で閲覧できる（作成ボタンは表示されない）
+  await page.goto('#/settings/criteria')
+  await expect(page.getByRole('heading', { name: '評価基準' })).toBeVisible()
+  await expect(page.getByText('練習への取り組み').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '新しいバージョンを作成' })).toHaveCount(0)
 
   // コーチ権限で評価を入力・提出できる
   await page.goto('#/assessments/cycle-7/players/player-21')

@@ -57,8 +57,11 @@ const MAIN_NAV: NavItem[] = [
   { to: '/teams', label: 'チーム編成', icon: Layers },
 ]
 
+/** 評価者（管理者・コーチ）が参照できる評価基準。コーチは読み取り専用 */
+const CRITERIA_NAV: NavItem[] = [{ to: '/settings/criteria', label: '評価基準', icon: ListChecks }]
+
 const ADMIN_NAV: NavItem[] = [
-  { to: '/settings/criteria', label: '評価基準', icon: ListChecks },
+  ...CRITERIA_NAV,
   { to: '/settings/coaches', label: 'コーチ管理', icon: UserCog },
   { to: '/settings', label: 'システム設定', icon: Settings, end: true },
 ]
@@ -76,7 +79,7 @@ function isActivePath(pathname: string, item: NavItem): boolean {
 
 function AppSidebar() {
   const { pathname } = useLocation()
-  const { me, isAdmin } = useMe()
+  const { me, isAdmin, canEvaluate } = useMe()
   const { signOut } = useAuthActions()
   const { setOpenMobile } = useSidebar()
   const renderItems = (items: NavItem[]) =>
@@ -117,12 +120,12 @@ function AppSidebar() {
             <SidebarMenu>{renderItems(MAIN_NAV)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {/* 管理者専用画面は管理者以外のナビゲーションに表示しない（要件 10章） */}
-        {isAdmin && (
+        {/* 管理者専用画面は管理者以外のナビゲーションに表示しない（要件 10章）。評価基準は評価者に読み取り専用で公開 */}
+        {canEvaluate && (
           <SidebarGroup>
-            <SidebarGroupLabel>設定</SidebarGroupLabel>
+            <SidebarGroupLabel>{isAdmin ? '設定' : '参考資料'}</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>{renderItems(ADMIN_NAV)}</SidebarMenu>
+              <SidebarMenu>{renderItems(isAdmin ? ADMIN_NAV : CRITERIA_NAV)}</SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
