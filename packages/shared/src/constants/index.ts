@@ -220,12 +220,40 @@ export const ENGAGEMENT_CATEGORY: CriteriaTemplateCategory = {
   ],
 }
 
-/** 標準の配点。「練習への取り組み」を加えて合計100点にするため、既存カテゴリの配点を調整する */
-const STANDARD_WEIGHTS: Record<string, number> = { TEC: 25, DEC: 20, DUE: 25, INV: 20 }
+/** 技術力に追加した「シュート」（5段階）。標準の評価基準（v4）から使用する */
+export const SHOOTING_ITEM: CriteriaTemplateItem = {
+  itemKey: 'TEC-04',
+  name: 'シュート',
+  description: 'ゴールを狙って、枠へシュートを打てるか',
+  rubric: {
+    '1': 'ゴールを狙ったシュートがまだ難しい',
+    '3': '止まったボールや簡単な場面で、ゴールの枠へ打てる',
+    '5': '状況に応じてコースや強さを選び、枠へ打てる',
+  },
+}
 
-/** 標準の評価基準（初期データ・新規環境の既定）：基本の4カテゴリ＋練習への取り組み */
+/** 「練習への取り組み」を加えた時点（シュート追加前）の配点。履歴・デモデータで使用する */
+const WEIGHTS_BEFORE_SHOOTING: Record<string, number> = { TEC: 25, DEC: 20, DUE: 25, INV: 20 }
+
+/** 標準の配点。技術力にシュートを加えて30点、対人能力を20点にして合計100点とする */
+const STANDARD_WEIGHTS: Record<string, number> = { TEC: 30, DEC: 20, DUE: 20, INV: 20 }
+
+/** シュート追加前の評価基準（基本の4カテゴリ・9項目＋練習への取り組み）。過去の評価期間の再現用 */
+export const CRITERIA_BEFORE_SHOOTING: CriteriaTemplateCategory[] = [
+  ...INITIAL_CRITERIA.map((c) => ({
+    ...c,
+    weight: WEIGHTS_BEFORE_SHOOTING[c.categoryKey] ?? c.weight,
+  })),
+  ENGAGEMENT_CATEGORY,
+]
+
+/** 標準の評価基準（初期データ・新規環境の既定）：基本の4カテゴリ（技術力にシュートを含む）＋練習への取り組み */
 export const STANDARD_CRITERIA: CriteriaTemplateCategory[] = [
-  ...INITIAL_CRITERIA.map((c) => ({ ...c, weight: STANDARD_WEIGHTS[c.categoryKey] ?? c.weight })),
+  ...INITIAL_CRITERIA.map((c) => ({
+    ...c,
+    weight: STANDARD_WEIGHTS[c.categoryKey] ?? c.weight,
+    items: c.categoryKey === 'TEC' ? [...c.items, SHOOTING_ITEM] : c.items,
+  })),
   ENGAGEMENT_CATEGORY,
 ]
 

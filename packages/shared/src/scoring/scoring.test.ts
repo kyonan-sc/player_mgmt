@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildInitialCriteria, buildStandardCriteria } from '../criteria-template'
+import {
+  buildCriteriaBeforeShooting,
+  buildInitialCriteria,
+  buildStandardCriteria,
+} from '../criteria-template'
 import {
   aggregateAssessments,
   computeScores,
@@ -146,19 +150,27 @@ describe('isCriteriaCompatible / findMissingItems / validateCriteriaStructure', 
 describe('練習への取り組み（3段階）', () => {
   const standard = buildStandardCriteria()
   const eng = ['ENG-01', 'ENG-02', 'ENG-03', 'ENG-04']
-  /** 基本9項目をv点、取り組み4項目をe点にした入力 */
+  /** 基本10項目（シュートを含む）をv点、取り組み4項目をe点にした入力 */
   const base = (
     v: number,
     e: number | null = 3,
     overrides: Record<string, number | null> = {},
   ) => ({
     ...uniform(v),
+    'TEC-04': v,
     ...Object.fromEntries(eng.map((k) => [k, e])),
     ...overrides,
   })
 
-  it('標準の評価基準は配点合計100点（25/20/25/20/10）で、取り組みの4項目は3段階の必須項目', () => {
-    expect(standard.categories.map((c) => c.weight)).toEqual([25, 20, 25, 20, 10])
+  it('標準の評価基準は配点合計100点（30/20/20/20/10）で、シュートは5段階、取り組みの4項目は3段階の必須項目', () => {
+    expect(standard.categories.map((c) => c.weight)).toEqual([30, 20, 20, 20, 10])
+    const tec = standard.categories.find((c) => c.categoryKey === 'TEC')!.items
+    expect(tec.map((i) => [i.itemKey, i.maxScore])).toEqual([
+      ['TEC-01', 5],
+      ['TEC-02', 5],
+      ['TEC-03', 5],
+      ['TEC-04', 5],
+    ])
     const items = standard.categories.find((c) => c.categoryKey === 'ENG')!.items
     expect(items.map((i) => [i.maxScore, i.allowUnobserved])).toEqual([
       [3, false],
@@ -183,7 +195,7 @@ describe('練習への取り組み（3段階）', () => {
   it('総合は常に100点満点。5段階と3段階の項目が混在しても配点どおりに合算する', () => {
     // 基本4カテゴリ 4/5 = 80%（配点90 → 72点）＋ 取り組み 2/3（配点10 → 6.67点）
     const r = computeScores(standard, base(4, 2))
-    expect(r.categoryScores.TEC).toBeCloseTo(20)
+    expect(r.categoryScores.TEC).toBeCloseTo(24) // 4/5 × 30点
     expect(r.categoryScores.ENG).toBeCloseTo((2 / 3) * 10)
     expect(r.totalScore).toBe(78.7)
   })
@@ -194,7 +206,7 @@ describe('練習への取り組み（3段階）', () => {
     expect(r.totalScore).toBeNull()
   })
 
-  it('提出には全13項目が必要。満点を超える値は不正', () => {
+  it('提出には全14項目が必要。満点を超える値は不正', () => {
     expect(findMissingItems(standard, base(3))).toEqual([])
     expect(findMissingItems(standard, base(3, 3, { 'ENG-01': null }))).toEqual(['ENG-01'])
     expect(findMissingItems(standard, base(3, 3, { 'DEC-01': null }))).toEqual(['DEC-01'])
@@ -215,8 +227,16 @@ describe('練習への取り組み（3段階）', () => {
     expect(r.status).toBe('complete')
   })
 
-  it('取り組みを含む基準と含まない基準は互換でない（差分を出さない）', () => {
+  it('取り組みやシュートの有無・配点が違う基準は互換でない（差分を出さない）', () => {
     expect(isCriteriaCompatible(buildInitialCriteria(), standard)).toBe(false)
+    expect(isCriteriaCompatible(buildCriteriaBeforeShooting(), standard)).toBe(false)
+  })
+
+  it('シュート追加前の基準（25/20/25/20/10・13項目）も引き続き計算できる', () => {
+    const before = buildCriteriaBeforeShooting()
+    expect(before.categories.map((c) => c.weight)).toEqual([25, 20, 25, 20, 10])
+    const all = { ...uniform(5), ...Object.fromEntries(eng.map((k) => [k, 3])) }
+    expect(computeScores(before, all).totalScore).toBe(100)
   })
 })
 
@@ -228,6 +248,7 @@ describe('未観察を許可した項目（任意機能。標準の基準では�
   const eng = ['ENG-01', 'ENG-02', 'ENG-03', 'ENG-04']
   const input = (e: Record<string, number | null>) => ({
     ...uniform(4),
+    'TEC-04': 4,
     ...Object.fromEntries(eng.map((k) => [k, null])),
     ...e,
   })

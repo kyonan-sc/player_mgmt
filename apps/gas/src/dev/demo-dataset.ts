@@ -1,6 +1,7 @@
 import {
   aggregateAssessments,
   listItems,
+  buildCriteriaBeforeShooting,
   buildInitialCriteria,
   buildStandardCriteria,
   type Assessment,
@@ -71,6 +72,8 @@ const CYCLES = [
 const CRITERIA_V2_FROM = 5
 /** この評価期間インデックス以降は「練習への取り組み」を加えた基準（v3） */
 const CRITERIA_V3_FROM = 7
+/** この評価期間インデックス以降は「シュート」を加え配点を調整した標準基準（v4）。実施中の最新期間から適用 */
+const CRITERIA_V4_FROM = 9
 
 const FAMILY = [
   '佐藤',
@@ -289,17 +292,34 @@ export function buildStagingDemoDataset(
   criteriaV2.version = { ...criteriaV2.version, version: 'v2', name: '2026年度 改訂基準' }
   reviseWording(criteriaV2)
   // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階）を追加
-  const criteriaV3: CriteriaDefinition = buildStandardCriteria(
+  const criteriaV3: CriteriaDefinition = buildCriteriaBeforeShooting(
     'criteria-v3',
     iso(addDays(CYCLES[CRITERIA_V3_FROM]!.start, -14)),
     'coach-01',
     { version: 'v3', name: '2026年度 標準基準（練習への取り組みを追加）' },
   )
   reviseWording(criteriaV3)
+  // v4：技術力に「シュート」を追加（技術30・判断20・対人20・試合関与20・取り組み10）
+  const criteriaV4: CriteriaDefinition = buildStandardCriteria(
+    'criteria-v4',
+    iso(addDays(CYCLES[CRITERIA_V4_FROM]!.start, -14)),
+    'coach-01',
+    { version: 'v4', name: '2026年度 標準基準（シュートを追加・配点見直し）' },
+  )
+  reviseWording(criteriaV4)
   const criteriaFor = (t: number) =>
-    t >= CRITERIA_V3_FROM ? criteriaV3 : t >= CRITERIA_V2_FROM ? criteriaV2 : criteriaV1
-  /** 5段階の項目（基本の9項目）。選手ごとの力量はこのキーで持つ */
-  const itemKeys = criteriaV1.categories.flatMap((c) => c.items.map((i) => i.itemKey))
+    t >= CRITERIA_V4_FROM
+      ? criteriaV4
+      : t >= CRITERIA_V3_FROM
+        ? criteriaV3
+        : t >= CRITERIA_V2_FROM
+          ? criteriaV2
+          : criteriaV1
+  /** 5段階の項目（基本の10項目）。選手ごとの力量はこのキーで持つ */
+  const itemKeys = criteriaV4.categories
+    .flatMap((c) => c.items)
+    .filter((i) => i.maxScore === 5)
+    .map((i) => i.itemKey)
 
   const players: Player[] = Array.from({ length: 35 }, (_, i) => {
     const join = JOINERS[i]
@@ -523,7 +543,7 @@ export function buildStagingDemoDataset(
     }
   })
 
-  const criteriaList = [criteriaV1, criteriaV2, criteriaV3]
+  const criteriaList = [criteriaV1, criteriaV2, criteriaV3, criteriaV4]
   const tables: Record<string, Row[]> = {
     [TABLES.groups.name]: groups.map((g) => encodeRow(TABLES.groups, g)),
     [TABLES.coaches.name]: coaches.map((c) => encodeRow(TABLES.coaches, c)),
@@ -547,7 +567,7 @@ export function buildStagingDemoDataset(
     [TABLES.appSettings.name]: [
       encodeRow(TABLES.appSettings, {
         id: 'defaultCriteriaVersionId',
-        value: 'criteria-v3',
+        value: 'criteria-v4',
         updatedAt: created,
         updatedBy: 'coach-01',
       }),

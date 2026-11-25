@@ -275,6 +275,8 @@ describe('チーム編成・評価基準', () => {
 describe('練習への取り組み（3段階）', () => {
   const standard = buildStandardCriteria('std')
   const ENG = ['ENG-01', 'ENG-02', 'ENG-03', 'ENG-04']
+  /** 標準の基準（シュートを含む基本10項目）の入力 */
+  const std = (v: number) => ({ ...scoresOf(v), 'TEC-04': v })
   const engScores = (values: (number | null)[]) =>
     Object.fromEntries(ENG.map((k, i) => [k, values[i] ?? null]))
   const payload = (
@@ -328,7 +330,13 @@ describe('練習への取り組み（3段階）', () => {
   it('評価基準を作成すると、項目ごとの段階数が保存される', () => {
     const { created } = setup()
     const eng = created.categories.find((c) => c.categoryKey === 'ENG')!
-    expect(created.categories.map((c) => c.weight)).toEqual([25, 20, 25, 20, 10])
+    expect(created.categories.map((c) => c.weight)).toEqual([30, 20, 20, 20, 10])
+    expect(created.categories[0]!.items.map((i) => i.itemKey)).toEqual([
+      'TEC-01',
+      'TEC-02',
+      'TEC-03',
+      'TEC-04',
+    ])
     expect(eng.items.map((i) => [i.maxScore, i.allowUnobserved])).toEqual([
       [3, false],
       [3, false],
@@ -338,12 +346,12 @@ describe('練習への取り組み（3段階）', () => {
     expect(created.categories[0]!.items[0]).toMatchObject({ maxScore: 5, allowUnobserved: false })
   })
 
-  it('全13項目（取り組みは3段階）を入力すれば提出できる', () => {
+  it('全14項目（シュートを含む5段階10項目＋取り組み4項目）を入力すれば提出できる', () => {
     const { t, cycleId } = setup()
     const res = t.ok(
       EMAILS.coach,
       'assessments.submit',
-      payload(cycleId, { ...scoresOf(4), ...engScores([3, 3, 3, 3]) }),
+      payload(cycleId, { ...std(4), ...engScores([3, 3, 3, 3]) }),
     )
     expect(res.status).toBe('submitted')
   })
@@ -353,16 +361,16 @@ describe('練習への取り組み（3段階）', () => {
     const over = t.call(
       EMAILS.coach,
       'assessments.save',
-      payload(cycleId, { ...scoresOf(4), ...engScores([4, 3, 3, 3]) }),
+      payload(cycleId, { ...std(4), ...engScores([4, 3, 3, 3]) }),
     )
     expect(errorCode(over)).toBe('VALIDATION_ERROR')
     const short = t.call(
       EMAILS.coach,
       'assessments.submit',
-      payload(cycleId, { ...scoresOf(4), ...engScores([3, 3, 3]) }),
+      payload(cycleId, { ...std(4), ...engScores([3, 3, 3]) }),
     )
     expect(errorCode(short)).toBe('VALIDATION_ERROR')
-    expect(!short.success && short.error.message).toContain('必須の13項目')
+    expect(!short.success && short.error.message).toContain('必須の14項目')
   })
 
   it('確定すると、5段階と3段階の項目を配点どおりに合算した100点満点の結果になる', () => {
@@ -370,12 +378,12 @@ describe('練習への取り組み（3段階）', () => {
     t.ok(
       EMAILS.coach,
       'assessments.submit',
-      payload(cycleId, { ...scoresOf(4), ...engScores([3, 3, 1, 3]) }),
+      payload(cycleId, { ...std(4), ...engScores([3, 3, 1, 3]) }),
     )
     t.ok(
       EMAILS.coach2,
       'assessments.submit',
-      payload(cycleId, { ...scoresOf(4), ...engScores([1, 3, 1, 3]) }),
+      payload(cycleId, { ...std(4), ...engScores([1, 3, 1, 3]) }),
     )
     t.ok(EMAILS.admin, 'cycles.finalize', { id: cycleId, acknowledgeInsufficient: true })
 
@@ -387,7 +395,7 @@ describe('練習への取り組み（3段階）', () => {
     expect(row.result.itemScores['ENG-03']).toBe(1)
     // 取り組み：(2 + 3 + 1 + 3) / 4 = 2.25 → 2.25/3 × 10 = 7.5点。基本4カテゴリは4/5 = 80%
     expect(row.result.categoryScores.ENG).toBeCloseTo(7.5)
-    expect(row.result.categoryScores.TEC).toBeCloseTo(20)
+    expect(row.result.categoryScores.TEC).toBeCloseTo(24)
     // 基本4カテゴリ（配点90点）の4/5 = 72点 ＋ 取り組み 7.5点 ＝ 79.5点
     expect(row.result.totalScore).toBe(79.5)
   })

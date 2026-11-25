@@ -71,28 +71,28 @@ describe('評価入力画面（SCR-08）', () => {
     renderInput('/assessments/cycle-7/players/player-20')
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
     const radios = await screen.findAllByRole('radio')
-    // 5段階の9項目×5 + 練習への取り組み4項目×3段階
-    expect(radios).toHaveLength(57)
+    // 5段階の10項目（シュートを含む）×5 + 練習への取り組み4項目×3段階
+    expect(radios).toHaveLength(62)
     expect(radios.every((r) => r.getAttribute('aria-checked') === 'false')).toBe(true)
     expect(screen.queryByRole('radio', { name: /^未観察/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^提出$/ })).toBeDisabled()
-    expect(screen.getByText('あと13項目で表示')).toBeInTheDocument()
+    expect(screen.getByText('あと14項目で表示')).toBeInTheDocument()
   })
 
-  it('全13項目を入力すると総合得点が表示され、提出するとバックエンドに保存される', async () => {
+  it('全14項目を入力すると総合得点が表示され、提出するとバックエンドに保存される', async () => {
     const user = userEvent.setup()
     signInAs(COACH)
     renderInput('/assessments/cycle-7/players/player-20')
     const groups = await screen.findAllByRole('radiogroup')
-    expect(groups).toHaveLength(13)
-    // 取り組み（3段階）を除く9項目だけでは提出できない
-    for (const group of groups.slice(0, 9)) {
+    expect(groups).toHaveLength(14)
+    // 取り組み（3段階）を除く10項目だけでは提出できない
+    for (const group of groups.slice(0, 10)) {
       await user.click(within(group).getByRole('radio', { name: /^3点/ }))
     }
     expect(screen.getByRole('button', { name: /^提出$/ })).toBeDisabled()
     expect(screen.getByText('あと4項目で表示')).toBeInTheDocument()
 
-    for (const group of groups.slice(9)) {
+    for (const group of groups.slice(10)) {
       await user.click(within(group).getByRole('radio', { name: /^3点/ }))
     }
     // 基本4カテゴリ3/5 = 60%（配点90）＋ 練習への取り組み3/3 = 100%（配点10）

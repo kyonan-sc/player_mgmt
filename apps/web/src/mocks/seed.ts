@@ -1,5 +1,6 @@
 import {
   aggregateAssessments,
+  buildCriteriaBeforeShooting,
   buildInitialCriteria,
   buildStandardCriteria,
   listItems,
@@ -159,7 +160,7 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
   criteriaV2.categories[1]!.items[0]!.description =
     '味方・相手・スペースを、ボールを受ける前から認識しているか'
   // v3：配点を調整（25/20/25/20）して「練習への取り組み」（10点・3段階）を追加
-  const criteriaV3: CriteriaDefinition = buildStandardCriteria(
+  const criteriaV3: CriteriaDefinition = buildCriteriaBeforeShooting(
     'criteria-v3',
     iso('2026-09-01', 0),
     'coach-1',
@@ -167,10 +168,24 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
   )
   criteriaV3.categories[1]!.items[0]!.description =
     '味方・相手・スペースを、ボールを受ける前から認識しているか'
+  // v4：技術力に「シュート」を追加（技術30・判断20・対人20・試合関与20・取り組み10）。実施中の最新期間から適用
+  const criteriaV4: CriteriaDefinition = buildStandardCriteria(
+    'criteria-v4',
+    iso('2026-10-01', 0),
+    'coach-1',
+    { version: 'v4', name: '2026年度 標準基準（シュートを追加・配点見直し）' },
+  )
+  criteriaV4.categories[1]!.items[0]!.description =
+    '味方・相手・スペースを、ボールを受ける前から認識しているか'
   const V3_FROM = 4
-  const criteriaFor = (t: number) => (t >= V3_FROM ? criteriaV3 : t >= 3 ? criteriaV2 : criteriaV1)
+  const V4_FROM = CYCLE_DEFS.length - 1
+  const criteriaFor = (t: number) =>
+    t >= V4_FROM ? criteriaV4 : t >= V3_FROM ? criteriaV3 : t >= 3 ? criteriaV2 : criteriaV1
 
-  const itemKeys = criteriaV1.categories.flatMap((c) => c.items.map((i) => i.itemKey))
+  const itemKeys = criteriaV4.categories
+    .flatMap((c) => c.items)
+    .filter((i) => i.maxScore === 5)
+    .map((i) => i.itemKey)
 
   const players: Player[] = Array.from({ length: 30 }, (_, i) => ({
     id: `player-${String(i + 1).padStart(2, '0')}`,
@@ -388,7 +403,7 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
     }
   }
 
-  const criteriaRows = [criteriaV1, criteriaV2, criteriaV3]
+  const criteriaRows = [criteriaV1, criteriaV2, criteriaV3, criteriaV4]
   return {
     [TABLES.groups.name]: groups.map((g) => encodeRow(TABLES.groups, g)),
     [TABLES.coaches.name]: coaches.map((c) => encodeRow(TABLES.coaches, c)),
@@ -411,7 +426,7 @@ export function buildMockDataset(seed = MOCK_SEED): Record<string, Row[]> {
     [TABLES.appSettings.name]: [
       encodeRow(TABLES.appSettings, {
         id: 'defaultCriteriaVersionId',
-        value: 'criteria-v3',
+        value: 'criteria-v4',
         updatedAt: created,
         updatedBy: 'coach-1',
       }),

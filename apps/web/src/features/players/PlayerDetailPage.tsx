@@ -301,7 +301,7 @@ function Content({ detail }: { detail: PlayerDetail }) {
             <Tabs defaultValue="category">
               <TabsList className="mb-3">
                 <TabsTrigger value="category">カテゴリ</TabsTrigger>
-                <TabsTrigger value="item">9項目</TabsTrigger>
+                <TabsTrigger value="item">項目別</TabsTrigger>
               </TabsList>
               <TabsContent value="category">
                 <CategoryRadar detail={detail} criteria={latestCriteria} />

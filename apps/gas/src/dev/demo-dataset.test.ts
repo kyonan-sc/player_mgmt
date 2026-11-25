@@ -78,6 +78,30 @@ describe('検証用ダミーデータ（約1年分）', () => {
     expect(overview.players.length).toBe(33)
   })
 
+  it('評価基準は v1〜v4 の履歴を持ち、実施中の最新期間だけが「シュート」を含む標準基準（v4）を使う', () => {
+    const { tables } = setup()
+    const itemKeysOf = (versionId: string) => {
+      const categoryIds = new Set(
+        tables.criteria_categories!.filter((c) => c.versionId === versionId).map((c) => c.id),
+      )
+      return tables
+        .criteria_items!.filter((i) => categoryIds.has(i.categoryId as string))
+        .map((i) => i.itemKey)
+    }
+    expect(tables.criteria_versions!.map((v) => v.version)).toEqual(['v1', 'v2', 'v3', 'v4'])
+    expect(itemKeysOf('criteria-v3')).not.toContain('TEC-04')
+    expect(itemKeysOf('criteria-v4')).toContain('TEC-04')
+    expect(itemKeysOf('criteria-v4')).toHaveLength(14)
+
+    const cycle10 = tables.assessment_cycles!.find((c) => c.id === 'cycle-10')!
+    expect(cycle10.criteriaVersionId).toBe('criteria-v4')
+    const mine = tables.assessments!.filter(
+      (a) => a.cycleId === 'cycle-10' && a.status === 'submitted',
+    )
+    expect(mine.length).toBeGreaterThan(0)
+    expect(mine.every((a) => JSON.parse(a.scoresJson as string)['TEC-04'] !== undefined)).toBe(true)
+  })
+
   it('APP_ENV が staging 以外では実行を拒否する', () => {
     expect(() => assertStagingEnv('production')).toThrow(/staging/)
     expect(() => assertStagingEnv('staging')).not.toThrow()
