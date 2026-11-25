@@ -108,7 +108,9 @@ function CriteriaView({ c, latest }: { c: CriteriaDefinition; latest: boolean })
                         : (['5', '3', '1'] as const)
                       ).map((lv) => (
                         <div key={lv} className="flex gap-2">
-                          <dt className="num w-6 font-semibold">{lv}点</dt>
+                          <dt className="num w-10 shrink-0 whitespace-nowrap font-semibold">
+                            {lv}点
+                          </dt>
                           <dd className="text-muted-foreground">{item.rubric[lv] ?? '—'}</dd>
                         </div>
                       ))}
